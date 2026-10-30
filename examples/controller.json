@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "session_id": "00000000-0000-4000-8000-000000000001",
+  "application": "Synthetic example",
+  "version": "1.1.0",
+  "device": "Example device, no serial",
+  "source": "android-input-api",
+  "started_at_ms": 1793350800000,
+  "timezone": "Europe/Minsk",
+  "duration_ms": 2000,
+  "comment": "Synthetic QA data, not an observed device",
+  "limitations": "Example only. No hardware conclusion.",
+  "kind": "controller",
+  "display_dead_zone": 0.08,
+  "previous_session_id": null,
+  "capabilities": {
+    "axis_ranges": [],
+    "vibration_motors": 0
+  },
+  "frames": 2,
+  "button_presses": 0,
+  "axes": {
+    "left_x": {
+      "samples": 2,
+      "min": 0.04,
+      "max": 0.06,
+      "mean": 0.05,
+      "standard_deviation": 0.01,
+      "last": 0.06
+    },
+    "left_y": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    },
+    "right_x": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    },
+    "right_y": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    },
+    "left_trigger": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    },
+    "right_trigger": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    }
+  },
+  "resting_axes": {
+    "left_x": {
+      "samples": 2,
+      "min": 0.04,
+      "max": 0.06,
+      "mean": 0.05,
+      "standard_deviation": 0.01,
+      "last": 0.06
+    },
+    "left_y": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    },
+    "right_x": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    },
+    "right_y": {
+      "samples": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "standard_deviation": null,
+      "last": null
+    }
+  },
+  "recent_samples": [
+    [
+      0,
+      0.04,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    [
+      10,
+      0.06,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  ],
+  "trace_truncated": false,
+  "conclusion": "observed",
+  "event_interval_ms": {
+    "samples": 0,
+    "min": null,
+    "max": null,
+    "mean": null,
+    "standard_deviation": null,
+    "last": null
+  }
+}

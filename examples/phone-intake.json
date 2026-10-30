@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "session_id": "00000000-0000-4000-8000-000000000001",
+  "application": "RemTeh PhoneCheck",
+  "version": "0.1.0",
+  "device": "Example device, no serial",
+  "source": "operator/android-api",
+  "started_at_ms": 1793350800000,
+  "timezone": "Europe/Minsk",
+  "duration_ms": 2000,
+  "comment": "Synthetic QA data, not an observed device",
+  "limitations": "Example only. No hardware conclusion.",
+  "kind": "phone-intake",
+  "checks": {
+    "Экран": {
+      "status": "not-measured"
+    },
+    "Вибрация": {
+      "status": "unavailable",
+      "detail": "Synthetic absent motor",
+      "source": "operator/android-api",
+      "observed_at_ms": 1793350800000
+    }
+  }
+}

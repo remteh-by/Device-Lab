@@ -1,0 +1,839 @@
+package com.remteh.__APP_PACKAGE__;
+
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.hardware.input.InputManager;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.net.Uri;
+import android.widget.Button;
+import android.widget.EditText;
+import android.text.InputFilter;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import com.remteh.diagnostics.InputDiagnostics;
+import org.json.JSONObject;
+import org.json.JSONArray;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.view.InputDevice;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.SeekBar;
+import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.MobileAds;
+
+import com.remteh.__APP_PACKAGE__.view.StickView;
+import com.remteh.__APP_PACKAGE__.view.TriggerView;
+
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
+public abstract class BaseTestActivity extends AppCompatActivity implements InputManager.InputDeviceListener {
+
+    // UI
+    protected TextView tvStatus, tvControllerName, tvRawData, tvLatency, tvPressCount;
+    protected TriggerView triggerLT, triggerRT;
+    protected StickView stickLeft, stickRight;
+    protected TextView tvLeftStick, tvRightStick;
+    protected TextView tvTriggerLLabel, tvTriggerRLabel;
+    protected TextView btnLB, btnRB, btnL3, btnR3;
+    protected TextView btnDpadUp, btnDpadDown, btnDpadLeft, btnDpadRight;
+    protected TextView btnStart, btnSelect, btnSystem, btnExtra;
+    protected TextView btnFace1, btnFace2, btnFace3, btnFace4;
+    protected TextView btnVibShort, btnVibMedium, btnVibLong, btnVibPattern;
+    // Calibration UI
+    protected SeekBar seekDeadZone;
+    protected TextView tvDeadZoneVal;
+    protected TextView tvCalibInfo;
+    protected TextView btnResetCalib;
+
+    protected InputManager inputManager;
+    protected InputDevice connectedDevice;
+    protected int totalPresses = 0;
+    protected long lastInputTime = 0;
+    protected Map<Integer, Long> buttonPressTime = new HashMap<>();
+
+    protected InputDiagnostics.Session measurements = new InputDiagnostics.Session();
+    private JSONArray recentSamples = new JSONArray();
+    private long firstEventMillis = -1;
+    private String sessionId = UUID.randomUUID().toString();
+    private long sessionStarted = System.currentTimeMillis();
+    private long sessionMono = SystemClock.elapsedRealtime();
+    private String comment = "";
+    private String previousSession = null;
+    private JSONObject capabilities = new JSONObject();
+    private String reportDeviceName = "Не выбран";
+    private boolean restTest = false;
+    private Button restButton;
+    private String pendingExport;
+    private final ActivityResultLauncher<String> exportReport = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/json"), this::writeReport);
+    private final ActivityResultLauncher<String> exportPrintable = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("text/html"), this::writeReport);
+    private final ActivityResultLauncher<String> importReport = registerForActivityResult(
+            new ActivityResultContracts.GetContent(), this::compareReport);
+
+    // Calibration data
+    protected float deadZone = 0.08f;
+    protected float lxMin = 0, lxMax = 0, lyMin = 0, lyMax = 0;
+    protected float rxMin = 0, rxMax = 0, ryMin = 0, ryMax = 0;
+    protected float ltMin = 0, ltMax = 0, rtMin = 0, rtMax = 0;
+
+    // Abstract methods for controller-specific configuration
+    protected abstract int getAccentColor();
+    protected abstract String getControllerTitle();
+    protected abstract String[] getFaceButtonLabels();
+    protected abstract int[] getFaceButtonColors();
+    protected abstract String getShoulderLeftLabel();
+    protected abstract String getShoulderRightLabel();
+    protected abstract String getTriggerLeftLabel();
+    protected abstract String getTriggerRightLabel();
+    protected abstract String getStartLabel();
+    protected abstract String getSelectLabel();
+    protected abstract String getSystemLabel();
+    protected abstract String getExtraLabel();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_test);
+        initViews();
+        setupControllerTheme();
+        inputManager = (InputManager) getSystemService(INPUT_SERVICE);
+        inputManager.registerInputDeviceListener(this, null);
+        checkConnectedDevices();
+        setupVibrationButtons();
+        setupCalibration();
+        setupSessionActions();
+        initAds();
+    }
+
+    private void initAds() {
+        MobileAds.initialize(this, initializationStatus -> {});
+        AdView adView = findViewById(R.id.adView);
+        if (adView != null) {
+            adView.loadAd(new AdRequest.Builder().build());
+        }
+    }
+
+    protected void initViews() {
+        tvStatus = findViewById(R.id.tvStatus);
+        tvControllerName = findViewById(R.id.tvControllerName);
+        tvRawData = findViewById(R.id.tvRawData);
+        tvLatency = findViewById(R.id.tvLatency);
+        tvPressCount = findViewById(R.id.tvPressCount);
+        triggerLT = findViewById(R.id.triggerLT);
+        triggerRT = findViewById(R.id.triggerRT);
+        tvTriggerLLabel = findViewById(R.id.tvTriggerLLabel);
+        tvTriggerRLabel = findViewById(R.id.tvTriggerRLabel);
+        stickLeft = findViewById(R.id.stickLeft);
+        stickRight = findViewById(R.id.stickRight);
+        tvLeftStick = findViewById(R.id.tvLeftStick);
+        tvRightStick = findViewById(R.id.tvRightStick);
+        btnLB = findViewById(R.id.btnLB);
+        btnRB = findViewById(R.id.btnRB);
+        btnL3 = findViewById(R.id.btnL3);
+        btnR3 = findViewById(R.id.btnR3);
+        btnDpadUp = findViewById(R.id.btnDpadUp);
+        btnDpadDown = findViewById(R.id.btnDpadDown);
+        btnDpadLeft = findViewById(R.id.btnDpadLeft);
+        btnDpadRight = findViewById(R.id.btnDpadRight);
+        btnStart = findViewById(R.id.btnStart);
+        btnSelect = findViewById(R.id.btnSelect);
+        btnSystem = findViewById(R.id.btnSystem);
+        btnExtra = findViewById(R.id.btnExtra);
+        btnFace1 = findViewById(R.id.btnFace1);
+        btnFace2 = findViewById(R.id.btnFace2);
+        btnFace3 = findViewById(R.id.btnFace3);
+        btnFace4 = findViewById(R.id.btnFace4);
+        btnVibShort = findViewById(R.id.btnVibShort);
+        btnVibMedium = findViewById(R.id.btnVibMedium);
+        btnVibLong = findViewById(R.id.btnVibLong);
+        btnVibPattern = findViewById(R.id.btnVibPattern);
+        seekDeadZone = findViewById(R.id.seekDeadZone);
+        tvDeadZoneVal = findViewById(R.id.tvDeadZoneVal);
+        tvCalibInfo = findViewById(R.id.tvCalibInfo);
+        btnResetCalib = findViewById(R.id.btnResetCalib);
+    }
+
+    protected void setupControllerTheme() {
+        TextView tvTitle = findViewById(R.id.tvTitle);
+        tvTitle.setText(getControllerTitle());
+        int accent = getAccentColor();
+        stickLeft.setAccentColor(accent);
+        stickRight.setAccentColor(accent);
+        triggerLT.setAccentColor(accent);
+        triggerRT.setAccentColor(accent);
+
+        String[] labels = getFaceButtonLabels();
+        btnFace1.setText(labels[0]);
+        btnFace2.setText(labels[1]);
+        btnFace3.setText(labels[2]);
+        btnFace4.setText(labels[3]);
+
+        // Set controller-specific labels
+        btnLB.setText(getShoulderLeftLabel());
+        btnRB.setText(getShoulderRightLabel());
+        tvTriggerLLabel.setText(getTriggerLeftLabel());
+        tvTriggerRLabel.setText(getTriggerRightLabel());
+        btnStart.setText(getStartLabel());
+        btnSelect.setText(getSelectLabel());
+        btnSystem.setText(getSystemLabel());
+        btnExtra.setText(getExtraLabel());
+
+        View accentBar = findViewById(R.id.accentBar);
+        GradientDrawable barBg = new GradientDrawable();
+        barBg.setCornerRadius(6f);
+        barBg.setColor(accent);
+        accentBar.setBackground(barBg);
+    }
+
+    protected void setupCalibration() {
+        seekDeadZone.setMax(30); // 0-30% = 0.00 - 0.30
+        seekDeadZone.setProgress((int) (deadZone * 100));
+        tvDeadZoneVal.setText(String.format(Locale.US, "%.0f%%", deadZone * 100));
+
+        seekDeadZone.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean user) {
+                deadZone = progress / 100f;
+                tvDeadZoneVal.setText(String.format(Locale.US, "%.0f%%", deadZone * 100));
+                stickLeft.setDeadZone(deadZone);
+                stickRight.setDeadZone(deadZone);
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+
+        stickLeft.setDeadZone(deadZone);
+        stickRight.setDeadZone(deadZone);
+
+        btnResetCalib.setOnClickListener(v -> { saveLastReport(); clearLiveInput(); resetCalibration(); });
+    }
+
+    protected void resetCalibration() {
+        lxMin = lxMax = lyMin = lyMax = 0;
+        rxMin = rxMax = ryMin = ryMax = 0;
+        ltMin = ltMax = rtMin = rtMax = 0;
+        measurements = new InputDiagnostics.Session();
+        recentSamples = new JSONArray();
+        firstEventMillis = -1;
+        sessionId = UUID.randomUUID().toString();
+        sessionStarted = System.currentTimeMillis();
+        sessionMono = SystemClock.elapsedRealtime();
+        comment = ""; previousSession = null;
+        totalPresses = 0;
+        tvPressCount.setText("0");
+        tvCalibInfo.setText("Новая сессия измерений. Настройки контроллера не изменены.");
+    }
+
+    protected void updateCalibration(float lx, float ly, float rx, float ry, float lt, float rt) {
+        StringBuilder text = new StringBuilder("Исходные значения Android API (до фильтра приложения)\n");
+        for (int i = 0; i < InputDiagnostics.AXES.length; i++) {
+            InputDiagnostics.Axis axis = measurements.axis(i);
+            text.append(InputDiagnostics.AXES[i]).append(": ");
+            if (axis.count() == 0) text.append("не измерено / недоступно\n");
+            else text.append(String.format(Locale.US, "[%.3f..%.3f], N=%d\n", axis.min(), axis.max(), axis.count()));
+        }
+        if (restTest) text.append("Тест покоя: не трогайте стики. Среднее и разброс сохраняются в отчёте.\n");
+        InputDiagnostics.Axis intervals = measurements.intervals();
+        tvLatency.setText(intervals.count() == 0 ? "—" : String.format(Locale.US, "%.1f ms", intervals.mean()));
+        tvCalibInfo.setText(text.toString());
+    }
+
+    protected void setupVibrationButtons() {
+        btnVibShort.setOnClickListener(v -> vibrateGamepad(100));
+        btnVibMedium.setOnClickListener(v -> vibrateGamepad(300));
+        btnVibLong.setOnClickListener(v -> vibrateGamepad(800));
+        btnVibPattern.setOnClickListener(v -> vibrateGamepadPattern());
+        TextView btnBack = findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(v -> finish());
+    }
+
+    // --- Gamepad vibration (not system vibrator!) ---
+
+    protected List<Vibrator> getGamepadVibrators() {
+        List<Vibrator> result = new ArrayList<>();
+        if (connectedDevice == null) return result;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            android.os.VibratorManager manager = connectedDevice.getVibratorManager();
+            for (int id : manager.getVibratorIds()) {
+                Vibrator motor = manager.getVibrator(id);
+                if (motor != null && motor.hasVibrator()) result.add(motor);
+            }
+        } else {
+            Vibrator motor = connectedDevice.getVibrator();
+            if (motor != null && motor.hasVibrator()) result.add(motor);
+        }
+        return result;
+    }
+
+    protected void vibrateGamepad(long ms) {
+        List<Vibrator> motors = getGamepadVibrators();
+        if (motors.isEmpty()) {
+            Toast.makeText(this, "Вибрация контроллера недоступна через это подключение. Мотор телефона не используется.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        for (Vibrator motor : motors) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                motor.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            else motor.vibrate(ms);
+        }
+    }
+
+    protected void vibrateGamepadPattern() {
+        List<Vibrator> motors = getGamepadVibrators();
+        if (motors.isEmpty()) { vibrateGamepad(100); return; }
+        long[] pattern = {0, 100, 80, 100, 80, 300};
+        for (Vibrator motor : motors) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                motor.vibrate(VibrationEffect.createWaveform(pattern, -1));
+            else motor.vibrate(pattern, -1);
+        }
+    }
+
+    protected Vibrator getGamepadVibrator() {
+        List<Vibrator> motors = getGamepadVibrators();
+        return motors.isEmpty() ? null : motors.get(0);
+    }
+
+    protected void stopVibration() {
+        for (Vibrator motor : getGamepadVibrators()) motor.cancel();
+    }
+
+    private boolean acceptDevice(InputDevice device) {
+        if (device == null || !isGamepad(device)) return false;
+        if (connectedDevice == null) onGamepadConnected(device);
+        return connectedDevice.getId() == device.getId();
+    }
+
+    private int supportedAxis(InputDevice device, int preferred, int fallback) {
+        if (device.getMotionRange(preferred) != null) return preferred;
+        return device.getMotionRange(fallback) != null ? fallback : -1;
+    }
+
+    private String axisText(float value) {
+        return InputDiagnostics.finite(value) ? String.format(Locale.US, "%.3f", value) : "недоступно";
+    }
+
+    private float rawAxis(MotionEvent event, int axis) {
+        return axis < 0 || event.getDevice().getMotionRange(axis) == null ? Float.NaN : event.getAxisValue(axis);
+    }
+
+    private float displayAxis(InputDevice device, int axis, float raw, boolean trigger) {
+        InputDevice.MotionRange range = axis < 0 ? null : device.getMotionRange(axis);
+        if (range == null) return 0;
+        return trigger ? InputDiagnostics.normalizeTrigger(raw, range.getMin(), range.getMax())
+                : InputDiagnostics.filterStick(raw, range.getMin(), range.getMax(), deadZone);
+    }
+
+    // --- Analog input ---
+
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        InputDevice device = event.getDevice();
+        if (event.getAction() != MotionEvent.ACTION_MOVE || !acceptDevice(device)) return super.onGenericMotionEvent(event);
+        int[] axes = { MotionEvent.AXIS_X, MotionEvent.AXIS_Y,
+                supportedAxis(device, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX),
+                supportedAxis(device, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY),
+                supportedAxis(device, MotionEvent.AXIS_LTRIGGER, MotionEvent.AXIS_BRAKE),
+                supportedAxis(device, MotionEvent.AXIS_RTRIGGER, MotionEvent.AXIS_GAS) };
+        float[] raw = new float[6];
+        float[] display = new float[6];
+        for (int i = 0; i < axes.length; i++) {
+            raw[i] = rawAxis(event, axes[i]);
+            display[i] = displayAxis(device, axes[i], raw[i], i >= 4);
+        }
+        measurements.record(raw, event.getEventTime(), restTest);
+        if (firstEventMillis < 0) firstEventMillis = event.getEventTime();
+        JSONArray sample = new JSONArray();
+        sample.put(event.getEventTime() - firstEventMillis);
+        for (float value : raw) sample.put(InputDiagnostics.finite(value) ? (Object) (double) value : JSONObject.NULL);
+        recentSamples.put(sample);
+        if (recentSamples.length() > 256) recentSamples.remove(0);
+        stickLeft.setPosition(display[0], display[1]);
+        stickRight.setPosition(display[2], display[3]);
+        tvLeftStick.setText("API X:" + axisText(raw[0]) + " Y:" + axisText(raw[1]));
+        tvRightStick.setText("API X:" + axisText(raw[2]) + " Y:" + axisText(raw[3]));
+        triggerLT.setValue(display[4]); triggerRT.setValue(display[5]);
+        float hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X), hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+        setButtonState(btnDpadLeft, hatX < -.5f); setButtonState(btnDpadRight, hatX > .5f);
+        setButtonState(btnDpadUp, hatY < -.5f); setButtonState(btnDpadDown, hatY > .5f);
+        updateCalibration(raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
+        updateRawData(event, raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], hatX, hatY);
+        return true;
+    }
+
+    protected float applyDeadZone(float value) {
+        return InputDiagnostics.filterStick(value, -1, 1, deadZone);
+    }
+
+    // --- Button input ---
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        InputDevice device = event.getDevice();
+        if (acceptDevice(device)) {
+            if (event.getRepeatCount() == 0) totalPresses++;
+            tvPressCount.setText(String.valueOf(totalPresses));
+            if (event.getRepeatCount() == 0) buttonPressTime.put(keyCode, event.getEventTime());
+            setButtonForKeyCode(keyCode, true);
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        InputDevice device = event.getDevice();
+        if (acceptDevice(device)) {
+            setButtonForKeyCode(keyCode, false);
+            Long pressTime = buttonPressTime.remove(keyCode);
+            if (pressTime != null) {
+                long held = event.getEventTime() - pressTime;
+                tvRawData.setText(String.format(Locale.US,
+                        "Button: %s\nKeyCode: %d | Held: %d ms",
+                        KeyEvent.keyCodeToString(keyCode), keyCode, held));
+            }
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
+    }
+
+    protected void setButtonForKeyCode(int keyCode, boolean pressed) {
+        int[] colors = getFaceButtonColors();
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_BUTTON_A:
+                setFaceButtonState(btnFace1, pressed, colors[0]); break;
+            case KeyEvent.KEYCODE_BUTTON_B:
+                setFaceButtonState(btnFace2, pressed, colors[1]); break;
+            case KeyEvent.KEYCODE_BUTTON_X:
+                setFaceButtonState(btnFace3, pressed, colors[2]); break;
+            case KeyEvent.KEYCODE_BUTTON_Y:
+                setFaceButtonState(btnFace4, pressed, colors[3]); break;
+            case KeyEvent.KEYCODE_BUTTON_L1:
+                setButtonState(btnLB, pressed); break;
+            case KeyEvent.KEYCODE_BUTTON_R1:
+                setButtonState(btnRB, pressed); break;
+            case KeyEvent.KEYCODE_BUTTON_L2:
+                triggerLT.setValue(pressed ? 1 : 0); break;
+            case KeyEvent.KEYCODE_BUTTON_R2:
+                triggerRT.setValue(pressed ? 1 : 0); break;
+            case KeyEvent.KEYCODE_BUTTON_THUMBL:
+                setButtonState(btnL3, pressed); break;
+            case KeyEvent.KEYCODE_BUTTON_THUMBR:
+                setButtonState(btnR3, pressed); break;
+            case KeyEvent.KEYCODE_BUTTON_START:
+                setButtonState(btnStart, pressed); break;
+            case KeyEvent.KEYCODE_BUTTON_SELECT:
+                setButtonState(btnSelect, pressed); break;
+            case KeyEvent.KEYCODE_BUTTON_MODE:
+                setButtonState(btnSystem, pressed); break;
+            case KeyEvent.KEYCODE_MEDIA_RECORD:
+            case KeyEvent.KEYCODE_BUTTON_16:
+            case KeyEvent.KEYCODE_BUTTON_15:
+            case KeyEvent.KEYCODE_BUTTON_14:
+            case KeyEvent.KEYCODE_BUTTON_13:
+                setButtonState(btnExtra, pressed); break;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                setButtonState(btnDpadUp, pressed); break;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                setButtonState(btnDpadDown, pressed); break;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                setButtonState(btnDpadLeft, pressed); break;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                setButtonState(btnDpadRight, pressed); break;
+        }
+    }
+
+    protected void setButtonState(TextView btn, boolean pressed) {
+        if (btn == null) return;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(28f);
+        bg.setColor(pressed ? getAccentColor() : Color.parseColor("#2A2A45"));
+        btn.setBackground(bg);
+        btn.setScaleX(pressed ? 1.1f : 1f);
+        btn.setScaleY(pressed ? 1.1f : 1f);
+    }
+
+    protected void setFaceButtonState(TextView btn, boolean pressed, int activeColor) {
+        if (btn == null) return;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        if (pressed) {
+            bg.setColor(activeColor);
+            bg.setStroke(2, activeColor);
+        } else {
+            bg.setColor(Color.parseColor("#2A2A45"));
+            bg.setStroke(2, Color.parseColor("#3A3A55"));
+        }
+        btn.setBackground(bg);
+        btn.setScaleX(pressed ? 1.15f : 1f);
+        btn.setScaleY(pressed ? 1.15f : 1f);
+    }
+
+    protected void updateRawData(MotionEvent event, float lx, float ly, float rx, float ry,
+                                  float lt, float rt, float hatX, float hatY) {
+        StringBuilder sb = new StringBuilder("Исходные оси Android API\n");
+        for (InputDevice.MotionRange range : event.getDevice().getMotionRanges()) {
+            sb.append(MotionEvent.axisToString(range.getAxis())).append(": ")
+                    .append(axisText(event.getAxisValue(range.getAxis()))).append('\n');
+        }
+
+        tvRawData.setText(sb.toString());
+    }
+
+    // --- Device detection ---
+
+    protected boolean isGamepad(InputDevice device) {
+        int src = device.getSources();
+        return (src & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+                || (src & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+    }
+
+    protected void checkConnectedDevices() {
+        for (int id : InputDevice.getDeviceIds()) {
+            InputDevice device = InputDevice.getDevice(id);
+            if (device != null && isGamepad(device)) {
+                onGamepadConnected(device);
+                return;
+            }
+        }
+    }
+
+    protected void onGamepadConnected(InputDevice device) {
+        if (connectedDevice == null || connectedDevice.getId() != device.getId()) {
+            saveLastReport();
+            stopVibration();
+            clearLiveInput();
+            resetCalibration();
+        }
+        connectedDevice = device;
+        reportDeviceName = device.getName();
+        try {
+            JSONArray ranges = new JSONArray();
+            for (InputDevice.MotionRange range : device.getMotionRanges()) {
+                ranges.put(new JSONObject().put("axis", range.getAxis()).put("source", range.getSource())
+                        .put("min", (double) range.getMin()).put("max", (double) range.getMax())
+                        .put("flat", (double) range.getFlat()).put("fuzz", (double) range.getFuzz()));
+            }
+            capabilities = new JSONObject().put("axis_ranges", ranges)
+                    .put("vibration_motors", getGamepadVibrators().size())
+                    .put("vibration_source", "android-input-device-api")
+                    .put("unavailable_reason", "Unavailable axes/motors are not exposed by this device, transport or Android driver; no phone vibration fallback.");
+        } catch (Exception ignored) { capabilities = new JSONObject(); }
+        tvStatus.setText("✅ Подключён!");
+        tvStatus.setTextColor(getAccentColor());
+        String info = device.getName();
+        // Show vibrator info
+        Vibrator gv = getGamepadVibrator();
+        if (gv != null && gv.hasVibrator()) {
+            info += " | 🔊 Вибро ✓";
+        } else {
+            info += " | 🔇 Вибро ✗";
+        }
+        tvControllerName.setText(info);
+    }
+
+    @Override
+    public void onInputDeviceAdded(int deviceId) {
+        InputDevice device = InputDevice.getDevice(deviceId);
+        if (connectedDevice == null && device != null && isGamepad(device)) onGamepadConnected(device);
+    }
+
+    @Override
+    public void onInputDeviceRemoved(int deviceId) {
+        if (connectedDevice == null || connectedDevice.getId() != deviceId) return;
+        saveLastReport();
+        stopVibration();
+        clearLiveInput();
+        connectedDevice = null;
+        tvStatus.setText("❌ Отключён");
+        tvStatus.setTextColor(Color.parseColor("#E74856"));
+        tvControllerName.setText("");
+    }
+
+    @Override
+    public void onInputDeviceChanged(int deviceId) {
+        InputDevice device = InputDevice.getDevice(deviceId);
+        if (connectedDevice != null && connectedDevice.getId() == deviceId && device != null) onGamepadConnected(device);
+    }
+
+    private void setupSessionActions() {
+        LinearLayout parent = (LinearLayout) tvControllerName.getParent();
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        parent.addView(row, parent.indexOfChild(tvControllerName) + 1);
+        addAction(row, "Устройство", this::selectDevice);
+        restButton = addAction(row, "Тест покоя", () -> {
+            restTest = !restTest;
+            restButton.setText(restTest ? "Закончить покой" : "Тест покоя");
+            if (restTest) new AlertDialog.Builder(this).setTitle("Измерение центра")
+                    .setMessage("Отпустите стики. Записываются только полученные события Android API. Отсутствие событий означает «не измерено», а не исправность.")
+                    .setPositiveButton("Понятно", null).show();
+        });
+        LinearLayout reports = new LinearLayout(this);
+        parent.addView(reports, parent.indexOfChild(row) + 1);
+        addAction(reports, "Экспорт", () -> {
+            if (measurements.frames() == 0 && totalPresses == 0) {
+                message("Сначала выполните измерение."); return;
+            }
+            try {
+                pendingExport = report().toString(2);
+                exportReport.launch("remteh-controller-" + sessionId + ".json");
+            } catch (Exception error) { message("Не удалось подготовить отчёт."); }
+        });
+        addAction(reports, "Сравнить", () -> importReport.launch("application/json"));
+        addAction(reports, "История", this::showHistory);
+        LinearLayout details = new LinearLayout(this);
+        parent.addView(details, parent.indexOfChild(reports) + 1);
+        addAction(details, "Комментарий", () -> {
+            EditText input = new EditText(this); input.setText(comment);
+            input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(1000)});
+            new AlertDialog.Builder(this).setTitle("Комментарий к сессии").setView(input)
+                    .setPositiveButton("Сохранить", (dialog, which) -> comment = input.getText().toString())
+                    .setNegativeButton("Отмена", null).show();
+        });
+        addAction(details, "Печатный отчёт", () -> {
+            try {
+                pendingExport = "<!doctype html><html lang=ru><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+                        + "<title>RemTeh Controller Report</title><style>body{font:16px system-ui;padding:2rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>"
+                        + "<h1>Отчёт о контроллере</h1><p>Наблюдения Android API. Исправность не подтверждается автоматически. "
+                        + "Откройте файл в браузере и используйте Печать / PDF.</p><pre>"
+                        + html(report().toString(2)) + "</pre></html>";
+                exportPrintable.launch("remteh-controller-" + sessionId + ".html");
+            } catch (Exception error) { message("Не удалось подготовить отчёт."); }
+        });
+        tvControllerName.setOnClickListener(v -> selectDevice());
+    }
+
+    private Button addAction(LinearLayout row, String title, Runnable action) {
+        Button button = new Button(this);
+        button.setText(title);
+        button.setTextSize(12);
+        button.setAllCaps(false);
+        button.setOnClickListener(v -> action.run());
+        row.addView(button, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        return button;
+    }
+
+    private void selectDevice() {
+        List<InputDevice> devices = new ArrayList<>();
+        for (int id : InputDevice.getDeviceIds()) {
+            InputDevice device = InputDevice.getDevice(id);
+            if (device != null && isGamepad(device)) devices.add(device);
+        }
+        if (devices.isEmpty()) { message("Подключите контроллер по USB или Bluetooth."); return; }
+        String[] titles = new String[devices.size()];
+        for (int i = 0; i < devices.size(); i++) titles[i] = devices.get(i).getName();
+        new AlertDialog.Builder(this).setTitle("Активный контроллер").setItems(titles,
+                (dialog, which) -> onGamepadConnected(devices.get(which))).show();
+    }
+
+    private void clearLiveInput() {
+        buttonPressTime.clear();
+        measurements.pause();
+        lastInputTime = 0;
+        restTest = false;
+        if (restButton != null) restButton.setText("Тест покоя");
+        for (TextView button : new TextView[]{btnLB, btnRB, btnL3, btnR3, btnDpadUp,
+                btnDpadDown, btnDpadLeft, btnDpadRight, btnStart, btnSelect, btnSystem, btnExtra})
+            setButtonState(button, false);
+        TextView[] face = {btnFace1, btnFace2, btnFace3, btnFace4};
+        for (int i = 0; i < face.length; i++) setFaceButtonState(face[i], false, getFaceButtonColors()[i]);
+        stickLeft.setPosition(0, 0); stickRight.setPosition(0, 0);
+        triggerLT.setValue(0); triggerRT.setValue(0);
+        tvLeftStick.setText("—"); tvRightStick.setText("—");
+        tvLatency.setText("—");
+    }
+
+    private String html(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;"); }
+
+    private JSONObject axisReport(InputDiagnostics.Axis axis) throws Exception {
+        JSONObject result = new JSONObject().put("samples", axis.count());
+        result.put("min", axis.count() == 0 ? JSONObject.NULL : axis.min());
+        result.put("max", axis.count() == 0 ? JSONObject.NULL : axis.max());
+        result.put("mean", axis.count() == 0 ? JSONObject.NULL : axis.mean());
+        result.put("standard_deviation", axis.count() == 0 ? JSONObject.NULL : axis.deviation());
+        result.put("last", axis.count() == 0 ? JSONObject.NULL : axis.last());
+        return result;
+    }
+
+    private JSONObject report() throws Exception {
+        JSONObject axes = new JSONObject(), resting = new JSONObject();
+        for (int i = 0; i < InputDiagnostics.AXES.length; i++) {
+            axes.put(InputDiagnostics.AXES[i], axisReport(measurements.axis(i)));
+            if (i < 4) resting.put(InputDiagnostics.AXES[i], axisReport(measurements.restingAxis(i)));
+        }
+        return new JSONObject().put("schema", 1).put("kind", "controller")
+                .put("session_id", sessionId).put("started_at_ms", sessionStarted)
+                .put("timezone", java.util.TimeZone.getDefault().getID())
+                .put("duration_ms", SystemClock.elapsedRealtime() - sessionMono)
+                .put("comment", comment).put("previous_session_id", previousSession == null ? JSONObject.NULL : previousSession)
+                .put("capabilities", capabilities)
+                .put("conclusion", measurements.frames() == 0 && totalPresses == 0 ? "not-measured" : "observed")
+                .put("application", getPackageName())
+                .put("version", getPackageManager().getPackageInfo(getPackageName(), 0).versionName)
+                .put("os", "Android " + Build.VERSION.RELEASE)
+                .put("device", reportDeviceName).put("source", "android-input-api")
+                .put("transport", "not-reported-by-api").put("display_dead_zone", (double) deadZone)
+                .put("frames", measurements.frames()).put("button_presses", totalPresses)
+                .put("axes", axes).put("resting_axes", resting)
+                .put("event_interval_ms", axisReport(measurements.intervals()))
+                .put("recent_samples", recentSamples)
+                .put("trace_truncated", measurements.frames() > recentSamples.length())
+                .put("limitations", "API values may already be processed by the OS. Event intervals are not latency. No hardware calibration or firmware writes.");
+    }
+
+    private void writeReport(Uri uri) {
+        if (uri == null || pendingExport == null) return;
+        try (OutputStream output = getContentResolver().openOutputStream(uri, "wt")) {
+            if (output == null) throw new java.io.IOException();
+            output.write(pendingExport.getBytes(StandardCharsets.UTF_8));
+            message("Отчёт сохранён. Данные никуда не отправлялись.");
+        } catch (Exception error) { message("Не удалось сохранить файл."); }
+        finally { pendingExport = null; }
+    }
+
+    private void compareReport(Uri uri) {
+        if (uri == null) return;
+        try (InputStream input = getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+            if (input == null) throw new java.io.IOException();
+            byte[] chunk = new byte[4096]; int count;
+            while ((count = input.read(chunk)) != -1) {
+                if (buffer.size() + count > 1024 * 1024) throw new IllegalArgumentException();
+                buffer.write(chunk, 0, count);
+            }
+            String text = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+            checkJsonDepth(text);
+            showComparison(new JSONObject(text));
+        } catch (Exception error) { message("Нужен корректный отчёт RemTeh о контроллере (schema 1), до 1 МБ."); }
+    }
+
+    private void checkJsonDepth(String text) {
+        int depth = 0; boolean quoted = false, escaped = false;
+        for (char c : text.toCharArray()) {
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (c == '\\') escaped = true;
+                else if (c == '"') quoted = false;
+            } else if (c == '"') quoted = true;
+            else if (c == '{' || c == '[') { if (++depth > 16) throw new IllegalArgumentException(); }
+            else if (c == '}' || c == ']') depth--;
+        }
+    }
+
+    private void showComparison(JSONObject previous) throws Exception {
+        if (!(previous.get("schema") instanceof Number) || ((Number) previous.get("schema")).doubleValue() != 1
+                || !(previous.get("device") instanceof String) || !(previous.get("session_id") instanceof String)
+                || !"controller".equals(previous.getString("kind"))
+                || !"android-input-api".equals(previous.getString("source"))
+                || previous.getString("device").length() > 200) throw new IllegalArgumentException();
+        StringBuilder text = new StringBuilder("Среднее в явном тесте покоя: файл → текущая сессия\n");
+        if (!reportDeviceName.equals(previous.getString("device")))
+            text.append("Названия устройств различаются. Прямое сравнение может быть некорректным.\n");
+        if (!capabilities.toString().equals(previous.optJSONObject("capabilities") == null ? "" : previous.getJSONObject("capabilities").toString()))
+            text.append("Возможности или диапазоны осей различаются либо неизвестны. Сравнение ограничено.\n");
+        if (previous.optDouble("display_dead_zone", -1) != (double) deadZone)
+            text.append("Фильтр отображения отличается; значения API в отчёте не фильтруются.\n");
+        String importedId = previous.getString("session_id");
+        UUID.fromString(importedId);
+        JSONObject axes = previous.getJSONObject("resting_axes");
+        for (int i = 0; i < 4; i++) {
+            JSONObject axis = axes.getJSONObject(InputDiagnostics.AXES[i]);
+            Object count = axis.get("samples");
+            if (!(count instanceof Number) || ((Number) count).doubleValue() < 0
+                    || ((Number) count).doubleValue() > 1e12 || ((Number) count).doubleValue() != Math.floor(((Number) count).doubleValue())) throw new IllegalArgumentException();
+            String old = "не измерено", current = "не измерено";
+            if (((Number) count).doubleValue() > 0) {
+                Object value = axis.get("mean");
+                if (!(value instanceof Number) || (Double.isNaN(((Number) value).doubleValue()) || Double.isInfinite(((Number) value).doubleValue()))) throw new IllegalArgumentException();
+                old = String.format(Locale.US, "%.4f", ((Number) value).doubleValue());
+            }
+            if (measurements.restingAxis(i).count() > 0)
+                current = String.format(Locale.US, "%.4f", measurements.restingAxis(i).mean());
+            text.append(InputDiagnostics.AXES[i]).append(": ").append(old).append(" → ").append(current).append('\n');
+        }
+        text.append("Сравнивайте одинаковый контроллер и подключение. Это наблюдения API, не автоматический диагноз.");
+        new AlertDialog.Builder(this).setTitle("Сравнение измерений").setMessage(text)
+                .setPositiveButton("Закрыть", null)
+                .setNeutralButton("Связать до / после", (dialog, which) -> { previousSession = importedId; message("Сессии связаны в текущем отчёте."); }).show();
+    }
+
+    private void saveLastReport() {
+        if (measurements.frames() == 0 && totalPresses == 0) return;
+        try {
+            JSONArray existing = new JSONArray(getPreferences(MODE_PRIVATE).getString("history", "[]"));
+            JSONArray history = new JSONArray().put(report());
+            for (int i = 0; i < existing.length() && history.length() < 20; i++)
+                if (!sessionId.equals(existing.getJSONObject(i).optString("session_id")))
+                    history.put(existing.getJSONObject(i));
+            getPreferences(MODE_PRIVATE).edit().putString("history", history.toString()).apply();
+        } catch (Exception error) { message("Историю не удалось сохранить. Экспортируйте отчёт в файл."); }
+    }
+
+    private void showHistory() {
+        try {
+            JSONArray history = new JSONArray(getPreferences(MODE_PRIVATE).getString("history", "[]"));
+            if (history.length() == 0) { message("История пока пуста."); return; }
+            String[] titles = new String[history.length()];
+            for (int i = 0; i < titles.length; i++) {
+                JSONObject row = history.getJSONObject(i);
+                titles[i] = new java.util.Date(row.getLong("started_at_ms")).toString() + " · " + row.getString("device");
+            }
+            new AlertDialog.Builder(this).setTitle("Последние 20 сессий").setItems(titles, (dialog, which) -> {
+                try { showComparison(history.getJSONObject(which)); }
+                catch (Exception error) { message("Сохранённый отчёт повреждён."); }
+            }).show();
+        } catch (Exception error) { message("История недоступна."); }
+    }
+
+    private void message(String text) { Toast.makeText(this, text, Toast.LENGTH_LONG).show(); }
+
+    @Override
+    protected void onPause() {
+        saveLastReport();
+        stopVibration();
+        clearLiveInput();
+        AdView ad = findViewById(R.id.adView);
+        if (ad != null) ad.pause();
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (inputManager != null && connectedDevice == null) checkConnectedDevices();
+        AdView ad = findViewById(R.id.adView);
+        if (ad != null) ad.resume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        stopVibration();
+        AdView ad = findViewById(R.id.adView);
+        if (ad != null) ad.destroy();
+        if (inputManager != null) inputManager.unregisterInputDeviceListener(this);
+    }
+}

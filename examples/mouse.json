@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "kind": "mouse",
+  "session_id": "00000000-0000-4000-8000-000000000001",
+  "application": "RemTeh Mouse Tester",
+  "version": "1.1.0",
+  "started_at": "2026-10-30T16:09:00.953Z",
+  "timezone": "Europe/Minsk",
+  "duration_ms": 699.3999999910593,
+  "environment": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "device": "Example device, no serial",
+  "source": "not-measured",
+  "transport": "browser-not-reported",
+  "conditions": {
+    "input": "mouse",
+    "clickMode": "single",
+    "bounceThresholdMs": 60,
+    "scrollMode": "free"
+  },
+  "observations": [
+    {
+      "kind": "down",
+      "t": 180.29999999701977,
+      "values": [
+        0,
+        -1,
+        0
+      ]
+    },
+    {
+      "kind": "up",
+      "t": 184.3999999910593,
+      "values": [
+        0,
+        4.0999999940395355
+      ]
+    }
+  ],
+  "summary": {
+    "totalClicks": 1,
+    "suspectedBounce": 0,
+    "scrollReversals": 0,
+    "pointerEvents": 0,
+    "eventRateHz": null,
+    "peakEventRateHz": null,
+    "completedHolds": 1,
+    "meanHoldMs": 4.0999999940395355
+  },
+  "trace_truncated": false,
+  "comment": "Synthetic QA data, not an observed device",
+  "previous_session_id": null,
+  "conclusion": "observed",
+  "limitations": "Browser events, not USB polling, sensor accuracy, hardware latency or a confirmed hardware diagnosis. OS/browser processing and timer precision affect results. Mouse/trackpad is user-declared. Last 512 observations only.",
+  "os": "Synthetic browser fixture"
+}
