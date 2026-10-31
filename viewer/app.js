@@ -1,36 +1,84 @@
-'use strict';
-const selected={before:null,after:null};
-function parse(text){
- if(new TextEncoder().encode(text).length>1048576)throw new Error('Отчёт больше 1 МБ');
- const value=JSON.parse(text);if(!value||value.schema!==1||!['controller','mouse','phone-intake'].includes(value.kind))throw new Error('Нужен отчёт Device Lab schema 1');
- const pending=[[value,0]];let nodes=0;while(pending.length){const [entry,depth]=pending.pop();if(++nodes>10000||depth>16)throw new Error('Слишком сложный отчёт');if(entry&&typeof entry==='object'){for(const child of Object.values(entry))pending.push([child,depth+1]);}else if(typeof entry==='number'&&!Number.isFinite(entry))throw new Error('Некорректное число');else if(typeof entry==='string'&&entry.length>4000)throw new Error('Слишком длинное поле');}
- for(const field of ['session_id','application','version','source','device'])if(typeof value[field]!=='string'||value[field].length>400)throw new Error('Повреждён заголовок отчёта');
- if(value.kind==='mouse'&&(!value.summary||!value.conditions))throw new Error('Нет результатов мыши');
- if(value.kind==='controller'&&(!value.axes||!value.resting_axes))throw new Error('Нет результатов контроллера');
- if(value.kind==='phone-intake'&&!value.checks)throw new Error('Нет проверок телефона');
- const count=v=>Number.isSafeInteger(v)&&v>=0&&v<=1e12;
- const number=v=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=1e12;
- if(value.kind==='mouse'){
-  for(const key of ['totalClicks','suspectedBounce','scrollReversals','pointerEvents'])if(!count(value.summary[key]))throw new Error('Некорректные счётчики');
-  if(value.summary.eventRateHz!==null&&(!number(value.summary.eventRateHz)||value.summary.eventRateHz<0))throw new Error('Некорректная частота');
- }
- if(value.kind==='controller'&&(!number(value.display_dead_zone)||value.display_dead_zone<0||value.display_dead_zone>=1))throw new Error('Некорректная мёртвая зона');
- if(value.kind==='controller')for(const name of ['left_x','left_y','right_x','right_y']){
-  const row=value.resting_axes[name];if(!row||!count(row.samples))throw new Error('Некорректная выборка оси');
-  if(row.samples>0&&(!number(row.mean)||!number(row.standard_deviation)||row.standard_deviation<0))throw new Error('Некорректные измерения оси');
- }
- if(value.kind==='phone-intake')for(const row of Object.values(value.checks))if(!row||!['not-measured','observed','suspicion','unavailable'].includes(row.status))throw new Error('Некорректный статус проверки');
- return value;
+import {parseReport,comparison,measurements,kindName,statusName,checkName,stable,MAX_REPORT_BYTES} from './reports.js';
+const $=id=>document.getElementById(id),selected={before:null,after:null};
+const HISTORY='remteh-device-lab-history-v1',WORKSPACE='remteh-device-lab-workspace-v1',MAX_HISTORY=3*1024*1024;
+let history=[],storedRaw=null,storageBlocked=false;
+function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(className)el.className=className;return el;}
+function message(text){$('status').textContent=text;}
+function format(value){return value===null||value===undefined?'Не измерено':typeof value==='number'?value.toLocaleString('ru-RU',{maximumFractionDigits:4}):String(value);}
+function table(target,rows){const t=document.createElement('table');for(const [label,value]of rows){const row=document.createElement('tr'),th=node('th',label),td=node('td',format(value));th.scope='row';row.append(th,td);t.append(row);}target.append(t);}
+function documentPanel(target,report){
+ target.replaceChildren();
+ if(!report){const empty=node('div',undefined,'empty');empty.append(node('strong','Пока без отчёта'),node('span','Откройте JSON из тестера или выберите сессию из истории.'));target.append(empty);return;}
+ target.append(node('span',kindName(report.kind),'kind-badge'),node('h4',report.device),node('p',report.application+' '+report.version+' · '+(report.os||'ОС не указана'),'metadata'),node('p','Источник: '+report.source+' · сессия '+report.session_id,'metadata'));
+ table(target,measurements(report));
+ if(report.kind==='controller')target.append(node('p','Покой: число образцов N, среднее и стандартное отклонение значений API. Фильтр отображения: '+report.display_dead_zone+'.'));
+ if(report.kind==='mouse')target.append(node('p','Условия: '+JSON.stringify(report.conditions)));
+ target.append(node('h4','Комментарий'),node('p',report.comment||'Не указан'),node('h4','Ограничения'),node('p',report.limitations||'Наблюдения API. Автоматического диагноза нет.'));
+ const details=document.createElement('details');details.append(node('summary','Исходный JSON'),node('pre',JSON.stringify(report,null,2)));target.append(details);
 }
-function element(tag,text){const node=document.createElement(tag);node.textContent=String(text);return node;}
-function table(parent,rows){const result=document.createElement('table');for(const [label,value]of rows){const row=document.createElement('tr');row.append(element('th',label),element('td',value===null?'Не измерено':value));result.append(row);}parent.append(result);}
-function render(target,report,title){target.replaceChildren();target.append(element('h2',title));if(!report){target.append(element('p','Отчёт не выбран'));return;}target.append(element('p',report.device),element('p',report.application+' '+report.version+' · '+report.kind),element('p','Источник: '+report.source),element('p','Сессия: '+report.session_id));
- if(report.kind==='mouse'){table(target,[['Нажатия',report.summary.totalClicks],['Подозрения на повтор',report.summary.suspectedBounce],['Обратные шаги колеса',report.summary.scrollReversals],['Частота событий браузера, Гц',report.summary.eventRateHz],['Событий движения',report.summary.pointerEvents]]);target.append(element('p','Условия: '+JSON.stringify(report.conditions)));}
- if(report.kind==='controller'){table(target,Object.entries(report.resting_axes).map(([name,row])=>[name+' · покой',row.samples>0?'N='+row.samples+'; среднее '+row.mean+'; σ '+row.standard_deviation:'Не измерено']));target.append(element('p','Фильтр отображения: '+report.display_dead_zone+'; исходные значения API сохраняются отдельно.'))}
- if(report.kind==='phone-intake')table(target,Object.entries(report.checks).map(([name,row])=>[name,row.status+' · '+(row.detail||'')]));
- target.append(element('h3','Комментарий'),element('p',report.comment||'Не указан'),element('h3','Ограничения'),element('p',report.limitations||'Наблюдения API. Автоматического диагноза нет.'));
- const details=document.createElement('details');details.append(element('summary','Исходный JSON'),element('pre',JSON.stringify(report,null,2)));target.append(details);
+function comparePanel(){
+ const target=$('comparison');target.replaceChildren();const a=selected.before,b=selected.after;if(!a||!b)return;
+ const result=comparison(a,b);target.append(node('h3',result.compatible?'Условия совпадают':'Условия отличаются'));
+ target.append(node('p',result.compatible?'Сопоставьте результаты и размер выборки. Изменение показаний само по себе не доказывает исправность.':'Различаются: '+result.reasons.join(', ')+'. Прямое числовое сравнение ограничено.'));
+ if(a.kind!==b.kind)return;
+ let rows;
+ if(a.kind==='mouse')rows=measurements(a).map(([label,value],index)=>[label,value,measurements(b)[index][1]]);
+ else if(a.kind==='controller')rows=Object.keys(a.resting_axes).map(key=>[key+' · среднее в покое',a.resting_axes[key].samples?a.resting_axes[key].mean:null,b.resting_axes[key]?.samples?b.resting_axes[key].mean:null]);
+ else rows=[...new Set([...Object.keys(a.checks),...Object.keys(b.checks)])].map(key=>[checkName(key),statusName(a.checks[key]?.status),statusName(b.checks[key]?.status)]);
+ const t=document.createElement('table'),head=document.createElement('tr');for(const name of ['Показатель','До','После','Изменение']){const th=node('th',name);th.scope='col';head.append(th);}t.append(head);
+ for(const [label,left,right]of rows){const row=document.createElement('tr');row.append(node('th',label),node('td',format(left)),node('td',format(right)),node('td',result.compatible&&typeof left==='number'&&typeof right==='number'?format(right-left):'—'));t.append(row);}target.append(t);
 }
-function refresh(){render(document.getElementById('left'),selected.before,'До');render(document.getElementById('right'),selected.after,'После');if(selected.before&&selected.after){const a=selected.before,b=selected.after;const compatible=a.kind===b.kind&&a.source===b.source&&a.device===b.device&&a.display_dead_zone===b.display_dead_zone&&JSON.stringify(a.conditions??a.capabilities??null)===JSON.stringify(b.conditions??b.capabilities??null);document.getElementById('status').textContent=compatible?'Тип, источник и сохранённые условия совпадают. Сравните выборку и результаты; исправность не выводится автоматически.':'Тип, источник, устройство или условия отличаются. Прямое числовое сравнение ограничено.';}}
-for(const key of ['before','after'])document.getElementById(key).addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>1048576)throw new Error('Файл больше 1 МБ');const report=parse(await file.text());selected[key]=report;document.getElementById('status').textContent='Отчёт открыт локально.';refresh();}catch(error){document.getElementById('status').textContent=error.message+'; открытые отчёты сохранены.';}});
-document.getElementById('print').addEventListener('click',()=>window.print());document.getElementById('clear').addEventListener('click',()=>{selected.before=selected.after=null;document.getElementById('status').textContent='Отчёты закрыты.';refresh();});refresh();
+function checkpoint(){
+ try{sessionStorage.setItem(WORKSPACE,JSON.stringify(selected));return true;}catch{message('Документы открыты в этой вкладке. Не удалось сохранить черновик; экспортируйте JSON перед закрытием.');return false;}
+}
+function refresh(){
+ documentPanel($('left'),selected.before);documentPanel($('right'),selected.after);comparePanel();$('loaded-count').textContent=Object.values(selected).filter(Boolean).length+' / 2';$('print').disabled=!selected.before&&!selected.after;
+ for(const key of ['before','after'])for(const action of ['save','export'])document.querySelector(`[data-${action}="${key}"]`).disabled=!selected[key];
+}
+function open(key,report){selected[key]=report;refresh();message('Отчёт открыт локально. Для долговременного хранения сохраните его в историю или экспортируйте JSON.');checkpoint();}
+function validateHistory(value){
+ if(!value||value.format!=='remteh-device-lab-history'||value.schema!==1||!Array.isArray(value.entries)||value.entries.length>20)throw new Error('Нужна история Device Lab schema 1, до 20 отчётов');
+ const ids=new Set();for(const entry of value.entries){if(!entry||typeof entry.id!=='string'||entry.id.length>80||ids.has(entry.id)||typeof entry.saved_at!=='string'||!Number.isFinite(Date.parse(entry.saved_at)))throw new Error('Повреждена запись истории');ids.add(entry.id);parseReport(JSON.stringify(entry.report));}
+ if(new TextEncoder().encode(JSON.stringify(value)).length>MAX_HISTORY)throw new Error('История больше 3 МБ');return value.entries;
+}
+function historyValue(rows){return {format:'remteh-device-lab-history',schema:1,entries:rows};}
+function writeHistory(rows){
+ if(storageBlocked)throw new Error('Исходная история не прочитана. Экспортируйте резервную копию перед сбросом');
+ const raw=JSON.stringify(historyValue(rows));validateHistory(JSON.parse(raw));localStorage.setItem(HISTORY,raw);storedRaw=raw;history=rows;renderHistory();
+}
+function download(value,name,raw=false){const blob=new Blob([raw?value:JSON.stringify(value,null,2)],{type:raw?'text/plain;charset=utf-8':'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportReport(report){download(report,'remteh-'+report.kind+'-'+report.session_id.replace(/[^a-z0-9_-]/gi,'_').slice(0,80)+'.json');}
+function invite(){try{if(Date.now()<Number(localStorage.getItem('remteh-lab-support-hidden-until')||0))return;}catch{/* Core functionality is independent of invitation storage. */}$('support-invite').hidden=false;}
+function saveReport(key){
+ try{const report=selected[key];if(history.some(row=>stable(row.report)===stable(report))){message('Этот снимок отчёта уже есть в истории.');return;}if(history.length>=20)throw new Error('В истории уже 20 отчётов. Экспортируйте и удалите ненужную запись перед добавлением');writeHistory([{id:crypto.randomUUID(),saved_at:new Date().toISOString(),report},...history]);message('Отчёт сохранён в локальную историю.');invite();}
+ catch(error){message('Не удалось сохранить историю: '+error.message+'. Открытые отчёты сохранены в этой вкладке.');}
+}
+function renderHistory(){
+ $('history-count').textContent=history.length;$('storage-status').textContent=storageBlocked?'История не прочитана. Исходные данные сохранены; экспортируйте резервную копию перед сбросом.':history.length?'История хранится только в этом браузере. Для переноса используйте экспорт.':'Сохранённых отчётов пока нет.';$('reset-history').hidden=!storageBlocked;
+ const target=$('history-list');target.replaceChildren();if(!history.length)return;const grid=node('div',undefined,'history-grid');
+ for(const entry of history){const item=node('article',undefined,'history-item');item.append(node('h3',entry.report.device),node('p',kindName(entry.report.kind)+' · '+entry.report.application+' '+entry.report.version),node('p',new Date(entry.saved_at).toLocaleString('ru-RU')));const actions=node('div',undefined,'action-row');
+ for(const [label,action]of [['Открыть до',()=>open('before',entry.report)],['Открыть после',()=>open('after',entry.report)],['JSON',()=>exportReport(entry.report)],['Удалить',()=>{if(!confirm('Удалить этот отчёт из локальной истории? Экспортированный JSON останется у вас.'))return;try{writeHistory(history.filter(row=>row.id!==entry.id));message('Запись удалена из истории. Открытые документы сохранены.');}catch(error){message('История не изменена: '+error.message);}}]]){const button=node('button',label);button.addEventListener('click',action);actions.append(button);}item.append(actions);grid.append(item);
+ }target.append(grid);
+}
+for(const key of ['before','after']){
+ $(key).addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>MAX_REPORT_BYTES)throw new Error('Файл больше 1 МБ');open(key,parseReport(await file.text()));}catch(error){message(error.message+'; открытые отчёты сохранены.');}});
+ document.querySelector(`[data-save="${key}"]`).addEventListener('click',()=>saveReport(key));document.querySelector(`[data-export="${key}"]`).addEventListener('click',()=>exportReport(selected[key]));
+}
+$('print').addEventListener('click',()=>window.print());$('clear').addEventListener('click',()=>{selected.before=selected.after=null;refresh();checkpoint();message('Отчёты закрыты. История сохранена.');});
+$('backup-history').addEventListener('click',()=>download(storageBlocked?storedRaw:historyValue(history),storageBlocked?'device-lab-history-original.txt':'device-lab-history.json',storageBlocked));
+$('restore-history').addEventListener('click',()=>$('history-file').click());
+$('history-file').addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>MAX_HISTORY)throw new Error('Файл больше 3 МБ');const incoming=validateHistory(JSON.parse(await file.text()));let merged=[...history];for(const entry of incoming)if(!merged.some(row=>stable(row.report)===stable(entry.report)))merged.push({...entry,id:crypto.randomUUID()});validateHistory(historyValue(merged));if(!confirm('Добавить '+(merged.length-history.length)+' отчётов к локальной истории? Открытые документы не изменятся.'))return;writeHistory(merged);message('История объединена. Открытые отчёты сохранены.');}catch(error){message('История не изменена: '+error.message);}});
+$('reset-history').addEventListener('click',()=>{if(!confirm('Сбросить повреждённую локальную историю? Сначала экспортируйте её исходную копию.'))return;try{localStorage.removeItem(HISTORY);history=[];storedRaw=null;storageBlocked=false;renderHistory();message('Локальная история сброшена. Открытые документы сохранены.');}catch{message('Браузер не разрешил сброс истории. Исходные данные сохранены.');}});
+$('dismiss-support').addEventListener('click',()=>{$('support-invite').hidden=true;try{localStorage.setItem('remteh-lab-support-hidden-until',String(Date.now()+30*86400000));}catch{/* The invitation remains hidden in the current page. */}});
+try{storedRaw=localStorage.getItem(HISTORY);if(storedRaw)history=validateHistory(JSON.parse(storedRaw));}catch{storageBlocked=true;}
+try{const raw=sessionStorage.getItem(WORKSPACE);if(raw){const value=JSON.parse(raw);for(const key of ['before','after'])if(value[key])selected[key]=parseReport(JSON.stringify(value[key]));}}catch{message('Черновик не прочитан. Импортируйте исходный JSON; история остаётся без изменений.');}
+refresh();renderHistory();
+// App updates never force a reload of active imported documents.
+let waiting=null,changedElsewhere=false,requested=false,hadController=Boolean(navigator.serviceWorker?.controller);
+function showUpdate(worker){waiting=worker;$('update').hidden=false;}
+$('update').addEventListener('click',()=>{if(!checkpoint())return;if(changedElsewhere){location.reload();return;}requested=true;waiting?.postMessage({type:'ACTIVATE_UPDATE'});});
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!hadController){hadController=true;return;}if(requested)location.reload();else{changedElsewhere=true;showUpdate(null);}});
+ navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(registration=>{const check=()=>{if(registration.waiting&&hadController)showUpdate(registration.waiting);};check();registration.addEventListener('updatefound',()=>registration.installing?.addEventListener('statechange',check));navigator.serviceWorker.ready.then(()=>$('offline-state').textContent=navigator.onLine?'Готово к запуску без сети':'Офлайн · приложение и история доступны');setInterval(()=>registration.update().catch(()=>{}),60000);}).catch(()=>$('offline-state').textContent='Автономная копия не подготовлена. Сохраните исходные JSON перед закрытием.');
+ window.addEventListener('offline',()=>{$('offline-state').textContent='Офлайн · приложение и локальные данные';});window.addEventListener('online',()=>{$('offline-state').textContent='Сеть доступна · отчёты остаются локальными';});
+}else $('offline-state').textContent='Для автономной установки откройте сайт по HTTPS или локальному HTTP.';

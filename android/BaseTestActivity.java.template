@@ -114,8 +114,13 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        getDelegate().setLocalNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_test);
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.screenRoot), (view, insets) -> {
+            androidx.core.graphics.Insets bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() | androidx.core.view.WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom); return insets;
+        });
         initViews();
         setupControllerTheme();
         inputManager = (InputManager) getSystemService(INPUT_SERVICE);
@@ -128,8 +133,9 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
     }
 
     private void initAds() {
-        MobileAds.initialize(this, initializationStatus -> {});
         AdView adView = findViewById(R.id.adView);
+        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) { if (adView != null) adView.setVisibility(View.GONE); return; }
+        MobileAds.initialize(this, initializationStatus -> {});
         if (adView != null) {
             adView.loadAd(new AdRequest.Builder().build());
         }
@@ -374,7 +380,7 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
         stickRight.setPosition(display[2], display[3]);
         tvLeftStick.setText("API X:" + axisText(raw[0]) + " Y:" + axisText(raw[1]));
         tvRightStick.setText("API X:" + axisText(raw[2]) + " Y:" + axisText(raw[3]));
-        triggerLT.setValue(display[4]); triggerRT.setValue(display[5]);
+        triggerLT.setValue(InputDiagnostics.finite(raw[4]) ? display[4] : Float.NaN); triggerRT.setValue(InputDiagnostics.finite(raw[5]) ? display[5] : Float.NaN);
         float hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X), hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
         setButtonState(btnDpadLeft, hatX < -.5f); setButtonState(btnDpadRight, hatX > .5f);
         setButtonState(btnDpadUp, hatY < -.5f); setButtonState(btnDpadDown, hatY > .5f);
@@ -469,7 +475,7 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
         if (btn == null) return;
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(28f);
-        bg.setColor(pressed ? getAccentColor() : Color.parseColor("#2A2A45"));
+        bg.setColor(pressed ? getAccentColor() : Color.parseColor("#24313D"));
         btn.setBackground(bg);
         btn.setScaleX(pressed ? 1.1f : 1f);
         btn.setScaleY(pressed ? 1.1f : 1f);
@@ -483,8 +489,8 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
             bg.setColor(activeColor);
             bg.setStroke(2, activeColor);
         } else {
-            bg.setColor(Color.parseColor("#2A2A45"));
-            bg.setStroke(2, Color.parseColor("#3A3A55"));
+            bg.setColor(Color.parseColor("#24313D"));
+            bg.setStroke(2, Color.parseColor("#4A6074"));
         }
         btn.setBackground(bg);
         btn.setScaleX(pressed ? 1.15f : 1f);
@@ -541,15 +547,15 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
                     .put("vibration_source", "android-input-device-api")
                     .put("unavailable_reason", "Unavailable axes/motors are not exposed by this device, transport or Android driver; no phone vibration fallback.");
         } catch (Exception ignored) { capabilities = new JSONObject(); }
-        tvStatus.setText("✅ Подключён!");
+        tvStatus.setText("Контроллер подключён");
         tvStatus.setTextColor(getAccentColor());
         String info = device.getName();
         // Show vibrator info
         Vibrator gv = getGamepadVibrator();
         if (gv != null && gv.hasVibrator()) {
-            info += " | 🔊 Вибро ✓";
+            info += "\nВибрация доступна через Android API";
         } else {
-            info += " | 🔇 Вибро ✗";
+            info += "\nВибрация недоступна через Android API";
         }
         tvControllerName.setText(info);
     }
@@ -567,9 +573,9 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
         stopVibration();
         clearLiveInput();
         connectedDevice = null;
-        tvStatus.setText("❌ Отключён");
+        tvStatus.setText("Контроллер отключён");
         tvStatus.setTextColor(Color.parseColor("#E74856"));
-        tvControllerName.setText("");
+        tvControllerName.setText("Подключите по USB или Bluetooth и нажмите кнопку.");
     }
 
     @Override
@@ -579,61 +585,109 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
     }
 
     private void setupSessionActions() {
-        LinearLayout parent = (LinearLayout) tvControllerName.getParent();
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        parent.addView(row, parent.indexOfChild(tvControllerName) + 1);
+        LinearLayout row = findViewById(R.id.sessionActions);
         addAction(row, "Устройство", this::selectDevice);
         restButton = addAction(row, "Тест покоя", () -> {
+            if (connectedDevice == null) { selectDevice(); return; }
             restTest = !restTest;
-            restButton.setText(restTest ? "Закончить покой" : "Тест покоя");
+            restButton.setText(restTest ? "Закончить тест покоя" : "Тест покоя");
             if (restTest) new AlertDialog.Builder(this).setTitle("Измерение центра")
-                    .setMessage("Отпустите стики. Записываются только полученные события Android API. Отсутствие событий означает «не измерено», а не исправность.")
-                    .setPositiveButton("Понятно", null).show();
+                    .setMessage("Отпустите стики. Записываются события Android API. Отсутствие событий означает «не измерено».")
+                    .setPositiveButton("Начать", null).show();
         });
-        LinearLayout reports = new LinearLayout(this);
-        parent.addView(reports, parent.indexOfChild(row) + 1);
-        addAction(reports, "Экспорт", () -> {
-            if (measurements.frames() == 0 && totalPresses == 0) {
-                message("Сначала выполните измерение."); return;
-            }
-            try {
-                pendingExport = report().toString(2);
-                exportReport.launch("remteh-controller-" + sessionId + ".json");
-            } catch (Exception error) { message("Не удалось подготовить отчёт."); }
+        findViewById(R.id.btnReports).setOnClickListener(v -> showReportActions());
+        findViewById(R.id.photoCredits).setOnClickListener(v -> showPhotoCredits());
+        findViewById(R.id.rawToggle).setOnClickListener(v -> {
+            boolean show = tvRawData.getVisibility() != View.VISIBLE;
+            tvRawData.setVisibility(show ? View.VISIBLE : View.GONE);
+            ((Button) v).setText(show ? "Скрыть исходные данные" : "Показать исходные данные");
         });
-        addAction(reports, "Сравнить", () -> importReport.launch("application/json"));
-        addAction(reports, "История", this::showHistory);
-        LinearLayout details = new LinearLayout(this);
-        parent.addView(details, parent.indexOfChild(reports) + 1);
-        addAction(details, "Комментарий", () -> {
-            EditText input = new EditText(this); input.setText(comment);
-            input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(1000)});
-            new AlertDialog.Builder(this).setTitle("Комментарий к сессии").setView(input)
-                    .setPositiveButton("Сохранить", (dialog, which) -> comment = input.getText().toString())
-                    .setNegativeButton("Отмена", null).show();
-        });
-        addAction(details, "Печатный отчёт", () -> {
-            try {
-                pendingExport = "<!doctype html><html lang=ru><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-                        + "<title>RemTeh Controller Report</title><style>body{font:16px system-ui;padding:2rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>"
-                        + "<h1>Отчёт о контроллере</h1><p>Наблюдения Android API. Исправность не подтверждается автоматически. "
-                        + "Откройте файл в браузере и используйте Печать / PDF.</p><pre>"
-                        + html(report().toString(2)) + "</pre></html>";
-                exportPrintable.launch("remteh-controller-" + sessionId + ".html");
-            } catch (Exception error) { message("Не удалось подготовить отчёт."); }
-        });
+        findViewById(R.id.btnSupport).setOnClickListener(v -> showSupport());
         tvControllerName.setOnClickListener(v -> selectDevice());
     }
 
+    private void showReportActions() {
+        String[] actions = {"Экспорт JSON", "Сохранить в историю", "Сравнить с JSON", "История сессий", "Комментарий", "Печатный отчёт / PDF", "Источник фотографии", "Поддержать RemTeh"};
+        new AlertDialog.Builder(this).setTitle("Отчёты и сессии").setItems(actions, (dialog, which) -> {
+            switch (which) {
+                case 0:
+                    if (measurements.frames() == 0 && totalPresses == 0) { message("Сначала выполните измерение."); return; }
+                    try { pendingExport = report().toString(2); exportReport.launch("remteh-controller-" + sessionId + ".json"); }
+                    catch (Exception error) { message("Не удалось подготовить отчёт."); }
+                    break;
+                case 1:
+                    if (measurements.frames() == 0 && totalPresses == 0) { message("Сначала выполните измерение."); return; }
+                    if (saveLastReport()) maybeOfferSupport(); break;
+                case 2: importReport.launch("application/json"); break;
+                case 3: showHistory(); break;
+                case 4:
+                    EditText input = new EditText(this); input.setText(comment);
+                    input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(1000)});
+                    new AlertDialog.Builder(this).setTitle("Комментарий к сессии").setView(input)
+                            .setPositiveButton("Сохранить", (d, w) -> comment = input.getText().toString())
+                            .setNegativeButton("Отмена", null).show(); break;
+                case 5:
+                    try {
+                        pendingExport = "<!doctype html><html lang=ru><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+                                + "<title>RemTeh Controller Report</title><style>body{font:16px system-ui;padding:2rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>"
+                                + "<h1>Отчёт о контроллере</h1><p>Наблюдения Android API. Исправность не подтверждается автоматически. Откройте файл в браузере и используйте Печать / PDF.</p><pre>"
+                                + html(report().toString(2)) + "</pre></html>";
+                        exportPrintable.launch("remteh-controller-" + sessionId + ".html");
+                    } catch (Exception error) { message("Не удалось подготовить отчёт."); }
+                    break;
+                case 6: showPhotoCredits(); break;
+                default: showSupport();
+            }
+        }).setNegativeButton("Закрыть", null).show();
+    }
+
+    private void maybeOfferSupport() {
+        long until = getPreferences(MODE_PRIVATE).getLong("support_snooze_until", 0);
+        if (System.currentTimeMillis() < until || isFinishing() || isDestroyed()) return;
+        // One invitation per 30 days, only after the owner saved a useful report.
+        getPreferences(MODE_PRIVATE).edit().putLong("support_snooze_until", System.currentTimeMillis() + 30L * 86400000L).apply();
+        new AlertDialog.Builder(this).setTitle("Тест помог разобраться с контроллером?")
+                .setMessage("Поддержите бесплатные инструменты RemTeh и новые проверки. Разовый донат: $5 или своя сумма на Ko-fi.")
+                .setPositiveButton("Поддержать", (d, w) -> showSupport())
+                .setNegativeButton("Позже", null).show();
+    }
+
+    private void showSupport() {
+        new AlertDialog.Builder(this).setTitle("Поддержать RemTeh")
+                .setMessage("Добровольный разовый донат: $5 или своя сумма. Откроется страница RemTeh в браузере — сумму и доступный способ оплаты вы выбираете на Ko-fi. Все проверки остаются бесплатными.")
+                .setPositiveButton("Перейти на Ko-fi", (d, w) -> {
+                    try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/pavelzayats"))); }
+                    catch (android.content.ActivityNotFoundException error) { message("Откройте ko-fi.com/pavelzayats в браузере."); }
+                })
+                .setNeutralButton("Скопировать ссылку", (d, w) -> {
+                    android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (clipboard != null) clipboard.setPrimaryClip(android.content.ClipData.newPlainText("RemTeh Ko-fi", "https://ko-fi.com/pavelzayats"));
+                    message("Ссылка скопирована.");
+                }).setNegativeButton("Закрыть", null).show();
+    }
+
+    private void showPhotoCredits() {
+        TextView credits = new TextView(this);
+        credits.setText(R.string.photo_credit); credits.setTextSize(15);
+        int space = (int) (24 * getResources().getDisplayMetrics().density);
+        credits.setPadding(space, space, space, space);
+        android.text.util.Linkify.addLinks(credits, android.text.util.Linkify.WEB_URLS);
+        credits.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        new AlertDialog.Builder(this).setTitle("Настоящая фотография").setView(credits)
+                .setPositiveButton("Закрыть", null).show();
+    }
+
     private Button addAction(LinearLayout row, String title, Runnable action) {
-        Button button = new Button(this);
-        button.setText(title);
-        button.setTextSize(12);
-        button.setAllCaps(false);
+        com.google.android.material.button.MaterialButton button = new com.google.android.material.button.MaterialButton(this); button.setText(title); button.setTextSize(14); button.setAllCaps(false);
+        button.setMinHeight((int) (48 * getResources().getDisplayMetrics().density));
+        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#24313D")));
+        button.setTextColor(Color.parseColor("#F0F0F5"));
+        button.setCornerRadius((int) (8 * getResources().getDisplayMetrics().density));
         button.setOnClickListener(v -> action.run());
-        row.addView(button, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        return button;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        params.setMarginEnd((int) (4 * getResources().getDisplayMetrics().density));
+        params.bottomMargin = (int) (6 * getResources().getDisplayMetrics().density);
+        row.addView(button, params); return button;
     }
 
     private void selectDevice() {
@@ -661,7 +715,7 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
         TextView[] face = {btnFace1, btnFace2, btnFace3, btnFace4};
         for (int i = 0; i < face.length; i++) setFaceButtonState(face[i], false, getFaceButtonColors()[i]);
         stickLeft.setPosition(0, 0); stickRight.setPosition(0, 0);
-        triggerLT.setValue(0); triggerRT.setValue(0);
+        triggerLT.clear(); triggerRT.clear();
         tvLeftStick.setText("—"); tvRightStick.setText("—");
         tvLatency.setText("—");
     }
@@ -710,6 +764,7 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
             if (output == null) throw new java.io.IOException();
             output.write(pendingExport.getBytes(StandardCharsets.UTF_8));
             message("Отчёт сохранён. Данные никуда не отправлялись.");
+            maybeOfferSupport();
         } catch (Exception error) { message("Не удалось сохранить файл."); }
         finally { pendingExport = null; }
     }
@@ -780,8 +835,8 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
                 .setNeutralButton("Связать до / после", (dialog, which) -> { previousSession = importedId; message("Сессии связаны в текущем отчёте."); }).show();
     }
 
-    private void saveLastReport() {
-        if (measurements.frames() == 0 && totalPresses == 0) return;
+    private boolean saveLastReport() {
+        if (measurements.frames() == 0 && totalPresses == 0) return false;
         try {
             JSONArray existing = new JSONArray(getPreferences(MODE_PRIVATE).getString("history", "[]"));
             JSONArray history = new JSONArray().put(report());
@@ -789,7 +844,8 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
                 if (!sessionId.equals(existing.getJSONObject(i).optString("session_id")))
                     history.put(existing.getJSONObject(i));
             getPreferences(MODE_PRIVATE).edit().putString("history", history.toString()).apply();
-        } catch (Exception error) { message("Историю не удалось сохранить. Экспортируйте отчёт в файл."); }
+            return true;
+        } catch (Exception error) { message("Историю не удалось сохранить. Экспортируйте отчёт в файл."); return false; }
     }
 
     private void showHistory() {
@@ -809,6 +865,30 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
     }
 
     private void message(String text) { Toast.makeText(this, text, Toast.LENGTH_LONG).show(); }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        LinearLayout columns = findViewById(R.id.mainColumns);
+        LinearLayout hero = findViewById(R.id.controllerHero);
+        int photoOrientation = getResources().getInteger(R.integer.photo_orientation);
+        hero.setOrientation(photoOrientation);
+        LinearLayout.LayoutParams picture = (LinearLayout.LayoutParams) hero.getChildAt(0).getLayoutParams();
+        picture.width = photoOrientation == LinearLayout.HORIZONTAL ? (int) (120 * getResources().getDisplayMetrics().density) : LinearLayout.LayoutParams.MATCH_PARENT;
+        hero.getChildAt(0).setLayoutParams(picture);
+        LinearLayout.LayoutParams description = (LinearLayout.LayoutParams) hero.getChildAt(1).getLayoutParams();
+        description.width = photoOrientation == LinearLayout.HORIZONTAL ? 0 : LinearLayout.LayoutParams.MATCH_PARENT;
+        hero.getChildAt(1).setLayoutParams(description);
+        int orientation = getResources().getInteger(R.integer.content_orientation);
+        columns.setOrientation(orientation);
+        for (int i = 0; i < columns.getChildCount(); i++) {
+            View panel = columns.getChildAt(i);
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) panel.getLayoutParams();
+            params.width = orientation == LinearLayout.HORIZONTAL ? 0 : LinearLayout.LayoutParams.MATCH_PARENT;
+            panel.setLayoutParams(params);
+            panel.setPadding(0, 0, i == 0 ? getResources().getDimensionPixelSize(R.dimen.column_gap) : 0, 0);
+        }
+    }
 
     @Override
     protected void onPause() {

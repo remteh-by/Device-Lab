@@ -1,0 +1,39 @@
+[
+  {
+    "asset_path": "viewer/assets/remteh-mouse.webp",
+    "type": "original-generated-illustration",
+    "tool": "built-in imagegen",
+    "requested_by_owner": "Unique realistic unbranded mouse with a transparent background and animated buttons",
+    "background": "transparent alpha",
+    "sha256": "02270b54a0cab6aa69cff351cb6e75aab07dd9fdff93fc7f6f22526b1fae5286",
+    "dimensions": "800x1200",
+    "bytes": 64340
+  },
+  {
+    "asset_path": "viewer/assets/remteh-logo-white.png",
+    "type": "official-brand-asset",
+    "source_url": "https://remteh.by/images/logo_white.png",
+    "sha256": "fe0c7282454f554af5de21260152dcbe379b3f5cf70a80b8c2903d2404541f9c",
+    "dimensions": "161x38",
+    "bytes": 8248,
+    "changes": "none; official white RemTeh logo reused at owner request"
+  },
+  {
+    "slug": "xbox",
+    "model": "Xbox Series Wireless Controller · Carbon Black",
+    "author": "uKER",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Xbox_Series_Controller_Carbon_Black.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/cb/Xbox_Series_Controller_Carbon_Black.jpg",
+    "original_sha256": "5fc5117fc1f60e4cf43b0460c3d26ac8a43f28daece9aa71fff2ac0c7737ef7b",
+    "original_bytes": 1417355,
+    "asset_sha256": "2f6cb5d8d4b6ba801d5969e3f6825b200fc0b37bd92be970e75e30be04a2bf3f",
+    "asset_bytes": 183762,
+    "asset_dimensions": "1400x1050",
+    "changes": "AI-assisted background removal with imagegen, resized and converted to transparent WebP; original licensed photograph retained as provenance",
+    "derivative_license": "CC BY-SA 4.0",
+    "asset_path": "viewer/assets/xbox.webp",
+    "background": "transparent alpha"
+  }
+]

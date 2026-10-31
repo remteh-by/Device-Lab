@@ -33,11 +33,19 @@ for repo, package in packages.items():
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(payload)
         manifest[relative] = hashlib.sha256(payload).hexdigest()
-    if not args.check:
-        (root / "diagnostics-core/SOURCE.json").write_text(json.dumps({
-            "component": "RemTeh Device Lab", "schema": 1, "files": manifest,
-            "upstream": "canonical Device Lab source; see docs/DEVICE-LAB.md"
-        }, indent=2) + "\n")
+    source_record = {
+        "component": "RemTeh Device Lab", "schema": 1, "files": manifest,
+        "upstream": "https://github.com/remteh-by/Device-Lab; see docs/DEVICE-LAB.md"
+    }
+    record_path = root / "diagnostics-core/SOURCE.json"
+    if args.check:
+        try:
+            if json.loads(record_path.read_text()) != source_record:
+                failed.append(repo + "/diagnostics-core/SOURCE.json")
+        except (OSError, ValueError):
+            failed.append(repo + "/diagnostics-core/SOURCE.json")
+    else:
+        record_path.write_text(json.dumps(source_record, indent=2) + "\n")
 if failed:
     raise SystemExit("Shared source differs:\n" + "\n".join(failed))
 print("Three tester copies match" if args.check else "Synchronized three tester copies")

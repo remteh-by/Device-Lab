@@ -1,0 +1,1 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item><shape><solid android:color="#10171b"/></shape></item><item><bitmap android:src="@drawable/remteh_logo_white" android:gravity="center"/></item></layer-list>

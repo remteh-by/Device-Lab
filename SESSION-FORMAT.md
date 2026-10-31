@@ -10,6 +10,6 @@ Current statuses: not-measured, observed, suspicion, unavailable. Imported repor
 
 The offline viewer opens up to two v1 reports, preserves current documents on an invalid import and offers a printable client view. Different kind/source/conditions make direct comparison invalid or limited. A named device is user-provided, not authenticated hardware identity. JSON export retains original observations; the viewer does not recalculate a diagnosis.
 
-Controller and mouse can link previous_session_id explicitly. PhoneCheck MVP shows bounded history but does not yet implement before/after editing or import. Optional repair order reference and full cross-app editing are deferred; CRM integration is excluded from this task. Do not add hidden identifiers or credentials to public code.
+Controller and mouse can link previous_session_id explicitly. PhoneCheck 0.2.0 supports bounded history and separate read-only imported comparisons. Current observations are never replaced by import. Optional repair order reference and full cross-app editing are deferred; CRM integration is excluded from this task. Do not add hidden identifiers or credentials to public code.
 
-A separate unified product/release is a later phase. This workspace reuses a canonical Java diagnostics core and synchronizes the thin Android adapter into the three existing APK projects, preserving their package names and licensing.
+Device Lab 0.2.0 publishes the unified local report workspace and PhoneCheck debug preview. It reuses a canonical Java diagnostics core and synchronizes the thin Android adapter into the three existing APK projects, preserving their package names and licensing.
