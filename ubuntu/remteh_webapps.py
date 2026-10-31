@@ -85,7 +85,8 @@ def unpack(raw,destination,key,version):
    target.chmod(0o755 if mode&0o111 else 0o644);files[str(target.relative_to(destination))]=sha(target)
  if web:validate_site(destination,spec)
  else:
-  binary=destination/'x-play';header=binary.open('rb').read(20)
+  binary=destination/'x-play'
+  with binary.open('rb') as stream:header=stream.read(20)
   if header[:6]!=b'\x7fELF\x02\x01' or header[18:20]!=b'\xb7\x00' or not (destination/'resources/app.asar').is_file():raise ValueError('Expected Linux ARM64 X Play')
   binary.chmod(0o755)
  return files
