@@ -185,7 +185,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     if '\\' in relative or '\x00' in relative or '..' in PurePosixPath(relative).parts:raise ValueError('Invalid path')
     current=(ROOT/key/'current').resolve();base=(current/spec['prefix']).resolve();target=(base/relative).resolve();target.relative_to(base)
     # A page fetched just before a version switch can still request its hashed bundles.
-    if not target.exists() and relative.startswith('assets/'):
+    if not target.exists() and (relative.startswith('assets/') or relative in {'app.js','reports.js','style.css'}):
      try:
       previous=json.loads((current/'receipt.json').read_text()).get('previous');numbers(previous);old=(ROOT/key/'versions'/previous/spec['prefix']).resolve();fallback=(old/relative).resolve();fallback.relative_to(old)
       if fallback.is_file():return str(fallback)

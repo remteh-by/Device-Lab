@@ -12,4 +12,4 @@ The offline viewer opens up to two v1 reports, preserves current documents on an
 
 Controller and mouse can link previous_session_id explicitly. PhoneCheck 0.2.0 supports bounded history and separate read-only imported comparisons. Current observations are never replaced by import. Optional repair order reference and full cross-app editing are deferred; CRM integration is excluded from this task. Do not add hidden identifiers or credentials to public code.
 
-Device Lab 0.2.0 publishes the unified local report workspace and PhoneCheck debug preview. It reuses a canonical Java diagnostics core and synchronizes the thin Android adapter into the three existing APK projects, preserving their package names and licensing.
+Device Lab 0.2.1 publishes the unified local report workspace and PhoneCheck debug preview. It reuses a canonical Java diagnostics core and synchronizes the thin Android adapter into the three existing APK projects, preserving their package names and licensing.
