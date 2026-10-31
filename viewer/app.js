@@ -1,6 +1,6 @@
 import {parseReport,comparison,measurements,kindName,statusName,checkName,stable,MAX_REPORT_BYTES} from './reports.js';
 const $=id=>document.getElementById(id),selected={before:null,after:null};
-const HISTORY='remteh-device-lab-history-v1',WORKSPACE='remteh-device-lab-workspace-v1',MAX_HISTORY=3*1024*1024;
+const LEGACY='remteh-device-lab-history-v1',HISTORY='remteh-device-lab-history-v2',WORKSPACE='remteh-device-lab-workspace-v1',MAX_HISTORY=3*1024*1024;
 let history=[],storedRaw=null,storageBlocked=false;
 function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(className)el.className=className;return el;}
 function message(text){$('status').textContent=text;}
@@ -42,22 +42,27 @@ function validateHistory(value){
  if(new TextEncoder().encode(JSON.stringify(value)).length>MAX_HISTORY)throw new Error('История больше 3 МБ');return value.entries;
 }
 function historyValue(rows){return {format:'remteh-device-lab-history',schema:1,entries:rows};}
-function writeHistory(rows){
- if(storageBlocked)throw new Error('Исходная история не прочитана. Экспортируйте резервную копию перед сбросом');
- const raw=JSON.stringify(historyValue(rows));validateHistory(JSON.parse(raw));localStorage.setItem(HISTORY,raw);storedRaw=raw;history=rows;renderHistory();
+function latestHistory(){const current=localStorage.getItem(HISTORY);return current===null?localStorage.getItem(LEGACY):current;}
+async function writeHistory(change){
+ if(!navigator.locks)throw new Error('Надёжная история требует Web Locks в современном браузере по HTTPS или локальному HTTP. Экспорт JSON доступен');
+ return navigator.locks.request(HISTORY,{mode:'exclusive'},()=>{
+  const raw=latestHistory(),fresh=raw?validateHistory(JSON.parse(raw)):[];
+  const rows=change(fresh),encoded=JSON.stringify(historyValue(rows));validateHistory(JSON.parse(encoded));
+  localStorage.setItem(HISTORY,encoded);storedRaw=encoded;storageBlocked=false;history=rows;renderHistory();return rows;
+ });
 }
 function download(value,name,raw=false){const blob=new Blob([raw?value:JSON.stringify(value,null,2)],{type:raw?'text/plain;charset=utf-8':'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportReport(report){download(report,'remteh-'+report.kind+'-'+report.session_id.replace(/[^a-z0-9_-]/gi,'_').slice(0,80)+'.json');}
 function invite(){try{if(Date.now()<Number(localStorage.getItem('remteh-lab-support-hidden-until')||0))return;}catch{/* Core functionality is independent of invitation storage. */}$('support-invite').hidden=false;}
-function saveReport(key){
- try{const report=selected[key];if(history.some(row=>stable(row.report)===stable(report))){message('Этот снимок отчёта уже есть в истории.');return;}if(history.length>=20)throw new Error('В истории уже 20 отчётов. Экспортируйте и удалите ненужную запись перед добавлением');writeHistory([{id:crypto.randomUUID(),saved_at:new Date().toISOString(),report},...history]);message('Отчёт сохранён в локальную историю.');invite();}
+async function saveReport(key){
+ try{const report=selected[key];let added=false;await writeHistory(current=>{if(current.some(row=>stable(row.report)===stable(report)))return current;if(current.length>=20)throw new Error('В истории уже 20 отчётов. Экспортируйте и удалите ненужную запись перед добавлением');added=true;return [{id:crypto.randomUUID(),saved_at:new Date().toISOString(),report},...current];});message(added?'Отчёт сохранён в локальную историю.':'Этот снимок отчёта уже есть в истории.');if(added)invite();}
  catch(error){message('Не удалось сохранить историю: '+error.message+'. Открытые отчёты сохранены в этой вкладке.');}
 }
 function renderHistory(){
- $('history-count').textContent=history.length;$('storage-status').textContent=storageBlocked?'История не прочитана. Исходные данные сохранены; экспортируйте резервную копию перед сбросом.':history.length?'История хранится только в этом браузере. Для переноса используйте экспорт.':'Сохранённых отчётов пока нет.';$('reset-history').hidden=!storageBlocked;
+ $('history-count').textContent=history.length;$('storage-status').textContent=storageBlocked?'История не прочитана. Исходные данные сохранены; экспортируйте резервную копию перед сбросом.':history.length?'История хранится только в этом браузере. Для переноса используйте экспорт.':'Сохранённых отчётов пока нет.';$('reset-history').hidden=!storageBlocked;try{$('legacy-history').hidden=!localStorage.getItem(LEGACY);}catch{$('legacy-history').hidden=true;}
  const target=$('history-list');target.replaceChildren();if(!history.length)return;const grid=node('div',undefined,'history-grid');
  for(const entry of history){const item=node('article',undefined,'history-item');item.append(node('h3',entry.report.device),node('p',kindName(entry.report.kind)+' · '+entry.report.application+' '+entry.report.version),node('p',new Date(entry.saved_at).toLocaleString('ru-RU')));const actions=node('div',undefined,'action-row');
- for(const [label,action]of [['Открыть до',()=>open('before',entry.report)],['Открыть после',()=>open('after',entry.report)],['JSON',()=>exportReport(entry.report)],['Удалить',()=>{if(!confirm('Удалить этот отчёт из локальной истории? Экспортированный JSON останется у вас.'))return;try{writeHistory(history.filter(row=>row.id!==entry.id));message('Запись удалена из истории. Открытые документы сохранены.');}catch(error){message('История не изменена: '+error.message);}}]]){const button=node('button',label);button.addEventListener('click',action);actions.append(button);}item.append(actions);grid.append(item);
+ for(const [label,action]of [['Открыть до',()=>open('before',entry.report)],['Открыть после',()=>open('after',entry.report)],['JSON',()=>exportReport(entry.report)],['Удалить',async()=>{if(!confirm('Удалить этот отчёт из локальной истории? Экспортированный JSON останется у вас.'))return;try{await writeHistory(current=>current.filter(row=>row.id!==entry.id));message('Запись удалена из истории. Открытые документы сохранены.');}catch(error){message('История не изменена: '+error.message);}}]]){const button=node('button',label);button.addEventListener('click',action);actions.append(button);}item.append(actions);grid.append(item);
  }target.append(grid);
 }
 for(const key of ['before','after']){
@@ -67,11 +72,13 @@ for(const key of ['before','after']){
 $('print').addEventListener('click',()=>window.print());$('clear').addEventListener('click',()=>{selected.before=selected.after=null;refresh();checkpoint();message('Отчёты закрыты. История сохранена.');});
 $('backup-history').addEventListener('click',()=>download(storageBlocked?storedRaw:historyValue(history),storageBlocked?'device-lab-history-original.txt':'device-lab-history.json',storageBlocked));
 $('restore-history').addEventListener('click',()=>$('history-file').click());
-$('history-file').addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>MAX_HISTORY)throw new Error('Файл больше 3 МБ');const incoming=validateHistory(JSON.parse(await file.text()));let merged=[...history];for(const entry of incoming)if(!merged.some(row=>stable(row.report)===stable(entry.report)))merged.push({...entry,id:crypto.randomUUID()});validateHistory(historyValue(merged));if(!confirm('Добавить '+(merged.length-history.length)+' отчётов к локальной истории? Открытые документы не изменятся.'))return;writeHistory(merged);message('История объединена. Открытые отчёты сохранены.');}catch(error){message('История не изменена: '+error.message);}});
-$('reset-history').addEventListener('click',()=>{if(!confirm('Сбросить повреждённую локальную историю? Сначала экспортируйте её исходную копию.'))return;try{localStorage.removeItem(HISTORY);history=[];storedRaw=null;storageBlocked=false;renderHistory();message('Локальная история сброшена. Открытые документы сохранены.');}catch{message('Браузер не разрешил сброс истории. Исходные данные сохранены.');}});
+$('history-file').addEventListener('change',async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>MAX_HISTORY)throw new Error('Файл больше 3 МБ');const incoming=validateHistory(JSON.parse(await file.text()));let merged=[...history];for(const entry of incoming)if(!merged.some(row=>stable(row.report)===stable(entry.report)))merged.push({...entry,id:crypto.randomUUID()});validateHistory(historyValue(merged));if(!confirm('Добавить '+(merged.length-history.length)+' отчётов к локальной истории? Открытые документы не изменятся.'))return;await writeHistory(current=>{const latest=[...current];for(const entry of incoming)if(!latest.some(row=>stable(row.report)===stable(entry.report)))latest.push({...entry,id:crypto.randomUUID()});return latest;});message('История объединена. Открытые отчёты сохранены.');}catch(error){message('История не изменена: '+error.message);}});
+$('reset-history').addEventListener('click',async()=>{const expected=storedRaw;if(!confirm('Начать пустую историю? Сначала экспортируйте исходную копию повреждённых данных.'))return;try{if(!navigator.locks)throw new Error('Web Locks недоступны');await navigator.locks.request(HISTORY,{mode:'exclusive'},()=>{if(latestHistory()!==expected)throw new Error('История изменилась в другом окне; обновите страницу');const empty=JSON.stringify(historyValue([]));localStorage.setItem(HISTORY,empty);history=[];storedRaw=empty;storageBlocked=false;renderHistory();});message('Новая история создана. История прежней версии и открытые документы сохранены.');}catch(error){message('История сохранена без изменений: '+error.message);}});
 $('dismiss-support').addEventListener('click',()=>{$('support-invite').hidden=true;try{localStorage.setItem('remteh-lab-support-hidden-until',String(Date.now()+30*86400000));}catch{/* The invitation remains hidden in the current page. */}});
-try{storedRaw=localStorage.getItem(HISTORY);if(storedRaw)history=validateHistory(JSON.parse(storedRaw));}catch{storageBlocked=true;}
+try{storedRaw=latestHistory();if(storedRaw)history=validateHistory(JSON.parse(storedRaw));}catch{storageBlocked=true;}
 try{const raw=sessionStorage.getItem(WORKSPACE);if(raw){const value=JSON.parse(raw);for(const key of ['before','after'])if(value[key])selected[key]=parseReport(JSON.stringify(value[key]));}}catch{message('Черновик не прочитан. Импортируйте исходный JSON; история остаётся без изменений.');}
+$('legacy-history').addEventListener('click',async()=>{try{const raw=localStorage.getItem(LEGACY);if(!raw)return;const rows=validateHistory(JSON.parse(raw));if(!confirm('Объединить историю предыдущей версии с текущей?'))return;await writeHistory(current=>{const merged=[...current];for(const entry of rows)if(!merged.some(row=>stable(row.report)===stable(entry.report)))merged.push({...entry,id:crypto.randomUUID()});return merged;});message('История предыдущей версии объединена. Открытые документы сохранены.');}catch(error){message('Предыдущая история сохранена без изменений: '+error.message);}});
+window.addEventListener('storage',event=>{if(event.key!==HISTORY&&event.key!==LEGACY)return;try{storedRaw=latestHistory();history=storedRaw?validateHistory(JSON.parse(storedRaw)):[];storageBlocked=false;}catch{storageBlocked=true;}renderHistory();});
 refresh();renderHistory();
 // App updates never force a reload of active imported documents.
 let waiting=null,changedElsewhere=false,requested=false,hadController=Boolean(navigator.serviceWorker?.controller);

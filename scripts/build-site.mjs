@@ -1,5 +1,12 @@
 import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';
 const source='viewer',dest='dist/site';fs.rmSync(dest,{recursive:true,force:true});fs.mkdirSync(dest,{recursive:true});fs.cpSync(source,dest,{recursive:true});
+const shortHash=data=>createHash('sha256').update(data).digest('hex').slice(0,12);
+const reports=fs.readFileSync(source+'/reports.js','utf8'),reportsName='reports-'+shortHash(reports)+'.js';
+const app=fs.readFileSync(source+'/app.js','utf8').replace("'./reports.js'","'./"+reportsName+"'"),appName='app-'+shortHash(app)+'.js';
+const css=fs.readFileSync(source+'/style.css'),cssName='style-'+shortHash(css)+'.css';
+for(const [name,data] of [[reportsName,reports],[appName,app],[cssName,css]])fs.writeFileSync(dest+'/assets/'+name,data);
+let document=fs.readFileSync(source+'/index.html','utf8').replace('href="style.css"','href="assets/'+cssName+'"').replace('src="app.js"','src="assets/'+appName+'"');fs.writeFileSync(dest+'/index.html',document);
+for(const name of ['reports.js','app.js','style.css'])fs.unlinkSync(dest+'/'+name);
 const logo=fs.readFileSync(source+'/assets/remteh-logo-white.png').toString('base64');fs.writeFileSync(dest+'/assets/icon.svg',`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512"><rect width="512" height="512" rx="108" fill="#10171b"/><image x="72" y="170" width="368" height="87" xlink:href="data:image/png;base64,${logo}"/><text x="256" y="328" fill="#b6e8d6" font-family="Arial,sans-serif" font-weight="bold" font-size="33" letter-spacing="7" text-anchor="middle">DEVICE LAB</text></svg>`);
 fs.writeFileSync(dest+'/manifest.webmanifest',JSON.stringify({id:'./',name:'RemTeh Device Lab',short_name:'Device Lab',start_url:'./',scope:'./',display:'standalone',lang:'ru',theme_color:'#10171b',background_color:'#10171b',icons:[{src:'assets/icon.svg',sizes:'any',type:'image/svg+xml',purpose:'any'}]}));
 const files=fs.readdirSync(dest,{recursive:true}).map(String).filter(name=>fs.statSync(path.join(dest,name)).isFile()).sort();const hash=createHash('sha256');for(const name of files)hash.update(name).update(fs.readFileSync(path.join(dest,name)));hash.update(fs.readFileSync(import.meta.filename));const cache='remteh-lab-'+hash.digest('hex').slice(0,16);

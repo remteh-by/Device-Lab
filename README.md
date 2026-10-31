@@ -1,10 +1,12 @@
-# RemTeh Device Lab 0.2.0 preview
+# RemTeh Device Lab 0.2.1 preview
 
 Локальная история и сравнение отчётов мыши, геймпада и телефона до / после ремонта.
 
-[**Открыть Device Lab →**](https://remteh-by.github.io/Device-Lab/) · [PhoneCheck APK, автономный сайт, исходники и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.0)
+[**Открыть Device Lab →**](https://remteh-by.github.io/Device-Lab/) · [PhoneCheck APK, автономный сайт, исходники и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.1)
 
-![Device Lab 0.2.0, реальный интерфейс браузера](docs/assets/device-lab-0.2.0.png)
+![Device Lab 0.2.1, реальный интерфейс браузера](docs/assets/device-lab-0.2.1.png)
+
+В 0.2.1 запись истории сериализуется между вкладками через Web Locks. История 0.2.0 остаётся сохранённой; поздние записи старой вкладки можно отдельно объединить кнопкой «Объединить историю предыдущей версии». Без Web Locks доступны просмотр и экспорт JSON. PhoneCheck остаётся версией 0.2.0 b2.
 
 Откройте JSON из Mouse Tester, Android DualSense / Xbox / Joy-Con Tester или PhoneCheck. Исходные файлы обрабатываются в браузере. Условия, источник и версия видны рядом с результатом; при различиях прямое числовое сравнение ограничено. Показания API и наблюдения мастера не являются автоматическим аппаратным диагнозом.
 
@@ -19,7 +21,7 @@
 | Mouse Tester | [Онлайн-тест мыши](https://remteh-by.github.io/Mouse-Tester/) |
 | Gamepad Tester | [Онлайн-проверка геймпада](https://remteh.by/remont-gamepadov/diagnostika-gejmpada) |
 | DualSense / Xbox / Joy-Con для Android | [DualSense](https://github.com/remteh-by/dualsense-tester/releases) · [Xbox](https://github.com/remteh-by/xbox-tester/releases) · [Joy-Con](https://github.com/remteh-by/joycon-tester/releases) |
-| PhoneCheck | [APK preview](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.0) |
+| PhoneCheck | [APK preview](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.1) |
 | Deckivo / X Play | [Deckivo](https://github.com/remteh-by/remteh-remote-play/releases) · [X Play](https://github.com/remteh-by/x-portal/releases) |
 
 Импорт поддерживает семейство JSON schema 1 из [SESSION-FORMAT.md](SESSION-FORMAT.md). Копируемый текст со стороннего или браузерного тестера не преобразуется в измерения этого формата автоматически. Разные API не считаются одной шкалой.
