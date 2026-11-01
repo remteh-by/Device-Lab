@@ -23,6 +23,8 @@ for repo, package in packages.items():
     if adapter.exists():
         contents["app/src/main/java/com/remteh/" + package + "/BaseTestActivity.java"] = \
             adapter.read_text().replace("__APP_PACKAGE__", package).encode()
+    contents["app/src/main/java/com/remteh/support/SupportDialog.java"] = (source / "android/SupportDialog.java").read_bytes()
+    contents["app/src/main/assets/remteh-support.json"] = (source / "support/registry.json").read_bytes()
     manifest = {}
     for relative, payload in contents.items():
         destination = root / relative

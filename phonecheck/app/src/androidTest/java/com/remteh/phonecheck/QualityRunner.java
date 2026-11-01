@@ -43,10 +43,10 @@ public final class QualityRunner extends Instrumentation {
    receive(fixture("bad.json","{\"schema\":1,\"kind\":\"phone-intake\",\"checks\":{\"screen\":{\"status\":\"healthy\"}}}"));check(importState().equals(before),"Invalid import preserves prior comparison");
    Activity original=current;runOnMainSync(()->current.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));for(int i=0;i<80&&current==original;i++)Thread.sleep(100);waitForIdleSync();check(current!=original,"Landscape recreation occurred");check(importState().equals(before),"Rotation preserves imported source");
    runOnMainSync(()->current.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));Thread.sleep(700);waitForIdleSync();
-   click("Поддержать разработку ↗");check(contains("Разовый донат добровольный"),"Voluntary external payment explanation");click("Позже");
+   click("Поддержать разработку ↗");check(contains("Выберите способ поддержки")||contains("Choose a support method"),"Provider chooser opened");click(current.getString(android.R.string.cancel));
    File directory=new File(getTargetContext().getApplicationInfo().dataDir,"shared_prefs");check(directory.setWritable(false,false),"Prepare isolated write failure");
    try{click("Новая проверка");click("Сохранить и начать");Field f=current.getClass().getDeclaredField("session");f.setAccessible(true);check(f.get(current).equals(id),"Failed storage does not clear current session");}finally{check(directory.setWritable(true,true),"Restore test directory permissions");}
-   screenshot("phonecheck-0.2.0.png");
+   screenshot("phonecheck-0.2.1.png");com.remteh.qa.SupportQuality.verify(this,current);result.putString("support_methods","6");
   }
   runOnMainSync(()->current.finish());waitForIdleSync();result.putString("passed","true");result.putInt("checks",checks);result.putString("scope","SDK Android 15, synthetic data; no hardware metrology or payment");finish(Activity.RESULT_OK,result);
  }catch(Throwable error){try{screenshot("failure.png");}catch(Exception ignored){}result.putString("passed","false");result.putString("failure",error.toString());finish(Activity.RESULT_CANCELED,result);}}

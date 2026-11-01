@@ -46,7 +46,7 @@ final class PhoneReportUi {
    new AlertDialog.Builder(host).setTitle("Сравнение до / после").setMessage(out).setPositiveButton("Экспорт текущей",(d,w)->exporter.export(after)).setNegativeButton("Закрыть",null).show();
   }catch(Exception e){notice("Сравнение недоступно для этого формата. Текущая проверка сохранена.");}
  }
- void support(){new AlertDialog.Builder(host).setTitle("Поддержка RemTeh").setMessage("Откроется Ko-fi в браузере. Разовый донат добровольный; сумму выбираете вы. Отчёты, фото и звук не передаются. Оплату обрабатывает Ko-fi.").setPositiveButton("Открыть Ko-fi",(d,w)->web("https://ko-fi.com/pavelzayats")).setNegativeButton("Позже",null).show();}
+ void support(){com.remteh.support.SupportDialog.show(host);}
  void web(String url){try{host.startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){notice("Не найден браузер для открытия ссылки");}}
  private void notice(String message){Toast.makeText(host,message,Toast.LENGTH_LONG).show();}
 }

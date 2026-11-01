@@ -10,12 +10,21 @@ try{
  assert.equal(await page.locator('#update').isVisible(),false);
  for(const width of [390,1920,2560,3840]){await page.setViewportSize({width,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);if(width>=1920)assert(await page.locator('.shell').evaluate(el=>el.getBoundingClientRect().width)>width*.9);if(width===390||width===1920)await page.screenshot({path:out+'/lab-'+width+'.png',fullPage:true});results.push({width,overflow:false});}
  await page.setViewportSize({width:1440,height:1000});
+ const supportContext=await context.browser().newContext({javaScriptEnabled:false});const supportPage=await supportContext.newPage();
+ const supportRegistry=JSON.parse(fs.readFileSync(root+'/support/registry.json','utf8'));
+ for(const width of [390,1920,2560,3840]){
+  await supportPage.setViewportSize({width,height:1000});await supportPage.goto(base+'assets/support/index.html');
+  assert.equal(await supportPage.locator('[data-method]').count(),6);assert.equal(await supportPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  for(const method of supportRegistry.methods){const card=supportPage.locator('[data-method='+method.id+']');assert.equal(await card.locator('a').getAttribute('href'),method.url);await card.locator('summary').click();await card.locator('img').evaluate(img=>img.decode());}
+ }
+ await supportContext.close();results.push({supportMethods:6,noJavascript:true,wideSupport:true});
+
  for(const kind of ['mouse','controller','phone-intake']){
   const report=JSON.parse(fs.readFileSync(root+'/examples/'+kind+'.json','utf8'));report.comment='<img src=x onerror="window.injected=true">';await upload(page,'before',report);await page.locator('#left').getByText(report.comment,{exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.injected),undefined);assert(await page.locator('#left table tr').count()>0);
   const invalid=structuredClone(report);if(kind==='controller')invalid.resting_axes.left_x.samples='2';else if(kind==='mouse')invalid.summary.totalClicks='2';else Object.values(invalid.checks)[0].status='passed';const before=await page.locator('#left').textContent();await upload(page,'before',invalid);await page.getByRole('status').filter({hasText:'открытые отчёты сохранены'}).waitFor();assert.equal(await page.locator('#left').textContent(),before);results.push({kind,validImport:true,invalidImportPreserves:true,scriptTextNotExecuted:true});
  }
  const mouse=JSON.parse(fs.readFileSync(root+'/examples/mouse.json','utf8'));await upload(page,'before',mouse);await upload(page,'after',{...mouse,conditions:Object.fromEntries(Object.entries(mouse.conditions).reverse())});await page.getByRole('heading',{name:'Условия совпадают'}).waitFor();
- await page.locator('[data-save=before]').click();await page.getByRole('status').filter({hasText:'сохранён в локальную историю'}).waitFor();assert.equal(await page.locator('#history-count').innerText(),'1');assert(await page.locator('#support-invite').isVisible());assert.equal(await page.locator('#support-invite a').getAttribute('href'),'https://ko-fi.com/pavelzayats');await page.locator('#dismiss-support').click();
+ await page.locator('[data-save=before]').click();await page.getByRole('status').filter({hasText:'сохранён в локальную историю'}).waitFor();assert.equal(await page.locator('#history-count').innerText(),'1');assert(await page.locator('#support-invite').isVisible());assert.equal(await page.locator('#support-invite a').getAttribute('href'),'assets/support/index.html');await page.locator('#dismiss-support').click();
  const downloadPromise=page.waitForEvent('download');await page.locator('#backup-history').click();const download=await downloadPromise;await download.saveAs(out+'/history.json');const history=JSON.parse(fs.readFileSync(out+'/history.json','utf8'));assert.equal(history.entries.length,1);assert.deepEqual(history.entries[0].report,mouse);
  await page.reload();await page.getByRole('heading',{name:'Условия совпадают'}).waitFor();assert.equal(await page.locator('#history-count').innerText(),'1');
  // Two independent tabs save together. Origin-scoped Web Locks serialize the read/write.

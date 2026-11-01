@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "version": "0.2.1",
+  "build": 3,
+  "capture_source": "Android 15 SDK ARM64 emulator, exact debug APK",
+  "synthetic_device_data": true,
+  "images": {
+    "phonecheck-0.2.1.png": {
+      "sha256": "5a0f25f21c8221d5142e3e63457d4da67b346f87479507ca1dc6c46df32a9706",
+      "width": 1080,
+      "height": 1920
+    },
+    "support-method.png": {
+      "sha256": "7a0e47728acafdd04082b7cf5f6a13c04593ceefdb451b5e07e62947ad68934e",
+      "width": 1080,
+      "height": 1920
+    }
+  }
+}

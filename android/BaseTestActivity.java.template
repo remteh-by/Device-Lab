@@ -647,24 +647,12 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
         // One invitation per 30 days, only after the owner saved a useful report.
         getPreferences(MODE_PRIVATE).edit().putLong("support_snooze_until", System.currentTimeMillis() + 30L * 86400000L).apply();
         new AlertDialog.Builder(this).setTitle("Тест помог разобраться с контроллером?")
-                .setMessage("Поддержите бесплатные инструменты RemTeh и новые проверки. Разовый донат: $5 или своя сумма на Ko-fi.")
+                .setMessage("Поддержите бесплатные инструменты RemTeh и новые проверки. Разовая или регулярная поддержка — по желанию.")
                 .setPositiveButton("Поддержать", (d, w) -> showSupport())
                 .setNegativeButton("Позже", null).show();
     }
 
-    private void showSupport() {
-        new AlertDialog.Builder(this).setTitle("Поддержать RemTeh")
-                .setMessage("Добровольный разовый донат: $5 или своя сумма. Откроется страница RemTeh в браузере — сумму и доступный способ оплаты вы выбираете на Ko-fi. Все проверки остаются бесплатными.")
-                .setPositiveButton("Перейти на Ko-fi", (d, w) -> {
-                    try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/pavelzayats"))); }
-                    catch (android.content.ActivityNotFoundException error) { message("Откройте ko-fi.com/pavelzayats в браузере."); }
-                })
-                .setNeutralButton("Скопировать ссылку", (d, w) -> {
-                    android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    if (clipboard != null) clipboard.setPrimaryClip(android.content.ClipData.newPlainText("RemTeh Ko-fi", "https://ko-fi.com/pavelzayats"));
-                    message("Ссылка скопирована.");
-                }).setNegativeButton("Закрыть", null).show();
-    }
+    private void showSupport() { com.remteh.support.SupportDialog.show(this); }
 
     private void showPhotoCredits() {
         TextView credits = new TextView(this);

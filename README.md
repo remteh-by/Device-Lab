@@ -1,12 +1,12 @@
-# RemTeh Device Lab 0.2.1 preview
+# RemTeh Device Lab 0.2.2 preview
 
 Локальная история и сравнение отчётов мыши, геймпада и телефона до / после ремонта.
 
-[**Открыть Device Lab →**](https://remteh-by.github.io/Device-Lab/) · [PhoneCheck APK, автономный сайт, исходники и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.1)
+[**Открыть Device Lab →**](https://remteh-by.github.io/Device-Lab/) · [PhoneCheck APK, автономный сайт, исходники и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.2)
 
-![Device Lab 0.2.1, реальный интерфейс браузера](docs/assets/device-lab-0.2.1.png)
+![Device Lab 0.2.2, реальный интерфейс браузера](docs/assets/device-lab-0.2.1.png)
 
-В 0.2.1 запись истории сериализуется между вкладками через Web Locks. История 0.2.0 остаётся сохранённой; поздние записи старой вкладки можно отдельно объединить кнопкой «Объединить историю предыдущей версии». Без Web Locks доступны просмотр и экспорт JSON. PhoneCheck остаётся версией 0.2.0 b2.
+В 0.2.1 запись истории сериализуется между вкладками через Web Locks. История 0.2.0 остаётся сохранённой; поздние записи старой вкладки можно отдельно объединить кнопкой «Объединить историю предыдущей версии». Без Web Locks доступны просмотр и экспорт JSON. В 0.2.2 добавлены шесть способов поддержки и обновлён PhoneCheck 0.2.1 b3.
 
 Откройте JSON из Mouse Tester, Android DualSense / Xbox / Joy-Con Tester или PhoneCheck. Исходные файлы обрабатываются в браузере. Условия, источник и версия видны рядом с результатом; при различиях прямое числовое сравнение ограничено. Показания API и наблюдения мастера не являются автоматическим аппаратным диагнозом.
 
@@ -21,7 +21,7 @@
 | Mouse Tester | [Онлайн-тест мыши](https://remteh-by.github.io/Mouse-Tester/) |
 | Gamepad Tester | [Онлайн-проверка геймпада](https://remteh.by/remont-gamepadov/diagnostika-gejmpada) |
 | DualSense / Xbox / Joy-Con для Android | [DualSense](https://github.com/remteh-by/dualsense-tester/releases) · [Xbox](https://github.com/remteh-by/xbox-tester/releases) · [Joy-Con](https://github.com/remteh-by/joycon-tester/releases) |
-| PhoneCheck | [APK preview](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.1) |
+| PhoneCheck | [APK preview](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.2) |
 | Deckivo / X Play | [Deckivo](https://github.com/remteh-by/remteh-remote-play/releases) · [X Play](https://github.com/remteh-by/x-portal/releases) |
 
 Импорт поддерживает семейство JSON schema 1 из [SESSION-FORMAT.md](SESSION-FORMAT.md). Копируемый текст со стороннего или браузерного тестера не преобразуется в измерения этого формата автоматически. Разные API не считаются одной шкалой.
@@ -30,7 +30,7 @@
 
 Восемь локальных проверок: цвета экрана, мультитач, короткий сигнал, запись / прослушивание микрофона, вибрация, датчики, системная камера и сведения о батарее. Мастер отмечает наблюдение, замечание, отсутствие измерения или недоступную функцию. Импорт JSON открывает отдельное сравнение и сохраняет текущую сессию. Подробности и ограничения — [phonecheck/README.md](phonecheck/README.md).
 
-![PhoneCheck 0.2.0 в Android 15 SDK-эмуляторе, синтетическая проверка](docs/assets/phonecheck-0.2.0.png)
+![PhoneCheck 0.2.1 в Android 15 SDK-эмуляторе, синтетическая проверка](docs/assets/phonecheck-0.2.1.png)
 
 APK подписан debug-сертификатом и является предварительной сборкой. Android 15 SDK-проверка охватывает обновление поверх 0.1.0 с сохранением истории, поворот, импорт, отказ аудио-доступа и сбой записи. Реальные камеры, звук, мотор, питание и разные OEM остаются отдельной аппаратной приёмкой. Приложение не запрашивает INTERNET, контакты, SMS или общую память. Фотографии и временный звук не включаются в JSON. Внешние страницы поддержки / новых версий открываются браузером по нажатию.
 
@@ -66,4 +66,8 @@ python3 -m unittest discover -s tests -p test_updates.py
 
 Проверены 390/1920/2560/3840 px, все три адаптера, неисполняемый текст, некорректные данные, экспорт, отказ хранилища, явное обновление и полный перезапуск браузера офлайн. Платежи и платные ИИ-запросы для проверок не выполнялись. Сохранена действующая [лицензия проекта](LICENSE); новая лицензия не назначалась.
 
-[Поддержать разработку на Ko-fi](https://ko-fi.com/pavelzayats): разовый добровольный донат, без передачи отчётов или платёжных данных приложению. Приглашение после сохранения отчёта можно скрыть на 30 дней. Факт оплаты приложение автоматически не подтверждает. [Изображения и атрибуция](PHOTO-CREDITS.md).
+[Выбрать способ поддержки](SUPPORT.md): разовая или регулярная добровольная поддержка, без передачи отчётов или платёжных данных приложению. Приглашение после сохранения отчёта можно скрыть на 30 дней. Факт оплаты приложение автоматически не подтверждает. [Изображения и атрибуция](PHOTO-CREDITS.md).
+
+## Support options
+
+[Ko-fi, Afdian, Boosty, DonationAlerts, DonatePay and OKX Pay](SUPPORT.md). Optional support; each method shows its current setup/payment-verification status.

@@ -47,7 +47,7 @@ public final class MainActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
  private final String[] tests={"screen","touch","speaker","microphone","vibration","sensors","camera","battery"};
  private JSONObject results=new JSONObject();private String session=UUID.randomUUID().toString();private long started=System.currentTimeMillis();private long startedMono=android.os.SystemClock.elapsedRealtime();
- private static final String VERSION="0.2.0";private PhoneReportUi reports;
+ private static final String VERSION="0.2.1";private PhoneReportUi reports;
  private String comment="",pendingExport;private TextView status;private MediaRecorder recorder;private MediaPlayer player;private ToneGenerator tone;private File clip;
  private SensorManager sensors;private SensorEventListener sensorListener;private Vibrator vibrator;
  @Override public void onCreate(Bundle saved){super.onCreate(saved);reports=new PhoneReportUi(this,this::report,this::exportReport);if(saved!=null)try{results=new JSONObject(saved.getString("results","{}"));session=saved.getString("session",session);started=saved.getLong("started",started);startedMono=saved.getLong("startedMono",startedMono);comment=saved.getString("comment","");pendingExport=saved.getString("export");reports.restore(saved.getString("comparison"));}catch(Exception ignored){}if(saved==null)restoreDraft();getWindow().setStatusBarColor(Color.rgb(16,23,27));getWindow().setNavigationBarColor(Color.rgb(16,23,27));home();}
