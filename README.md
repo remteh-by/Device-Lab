@@ -1,12 +1,12 @@
-# RemTeh Device Lab 0.2.2 preview
+# RemTeh Device Lab 0.2.3 preview
 
 Локальная история и сравнение отчётов мыши, геймпада и телефона до / после ремонта.
 
-[**Открыть Device Lab →**](https://remteh-by.github.io/Device-Lab/) · [PhoneCheck APK, автономный сайт, исходники и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.2)
+[**Открыть Device Lab →**](https://remteh-by.github.io/Device-Lab/) · [PhoneCheck APK, автономный сайт, исходники и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.3)
 
-![Device Lab 0.2.2, реальный интерфейс браузера](docs/assets/device-lab-0.2.1.png)
+![Device Lab 0.2.3, реальный интерфейс браузера](docs/assets/device-lab-0.2.3.png)
 
-В 0.2.1 запись истории сериализуется между вкладками через Web Locks. История 0.2.0 остаётся сохранённой; поздние записи старой вкладки можно отдельно объединить кнопкой «Объединить историю предыдущей версии». Без Web Locks доступны просмотр и экспорт JSON. В 0.2.2 добавлены шесть способов поддержки и обновлён PhoneCheck 0.2.1 b3.
+В 0.2.1 запись истории сериализуется между вкладками через Web Locks. История 0.2.0 остаётся сохранённой; поздние записи старой вкладки можно отдельно объединить кнопкой «Объединить историю предыдущей версии». Без Web Locks доступны просмотр и экспорт JSON. В 0.2.3 доступна поддержка через настроенную страницу Ko-fi; неподтверждённые варианты скрыты. В комплекте PhoneCheck 0.2.2 b4.
 
 Откройте JSON из Mouse Tester, Android DualSense / Xbox / Joy-Con Tester или PhoneCheck. Исходные файлы обрабатываются в браузере. Условия, источник и версия видны рядом с результатом; при различиях прямое числовое сравнение ограничено. Показания API и наблюдения мастера не являются автоматическим аппаратным диагнозом.
 
@@ -21,7 +21,7 @@
 | Mouse Tester | [Онлайн-тест мыши](https://remteh-by.github.io/Mouse-Tester/) |
 | Gamepad Tester | [Онлайн-проверка геймпада](https://remteh.by/remont-gamepadov/diagnostika-gejmpada) |
 | DualSense / Xbox / Joy-Con для Android | [DualSense](https://github.com/remteh-by/dualsense-tester/releases) · [Xbox](https://github.com/remteh-by/xbox-tester/releases) · [Joy-Con](https://github.com/remteh-by/joycon-tester/releases) |
-| PhoneCheck | [APK preview](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.2) |
+| PhoneCheck | [APK preview](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.3) |
 | Deckivo / X Play | [Deckivo](https://github.com/remteh-by/remteh-remote-play/releases) · [X Play](https://github.com/remteh-by/x-portal/releases) |
 
 Импорт поддерживает семейство JSON schema 1 из [SESSION-FORMAT.md](SESSION-FORMAT.md). Копируемый текст со стороннего или браузерного тестера не преобразуется в измерения этого формата автоматически. Разные API не считаются одной шкалой.
@@ -70,4 +70,8 @@ python3 -m unittest discover -s tests -p test_updates.py
 
 ## Support options
 
-[Ko-fi, Afdian, Boosty, DonationAlerts, DonatePay and OKX Pay](SUPPORT.md). Optional support; each method shows its current setup/payment-verification status.
+[Support RemTeh on Ko-fi](SUPPORT.md). Optional support through the configured page; pending and unverified providers are hidden.
+
+## Support options · 2026-11-07
+
+Only the configured [Ko-fi page](https://ko-fi.com/pavelzayats) is offered. Methods awaiting approval, verification or payment-readiness checks have been removed from the picker. Existing saved choices fall back to Ko-fi. Diagnostics remain free. See [SUPPORT.md](SUPPORT.md).

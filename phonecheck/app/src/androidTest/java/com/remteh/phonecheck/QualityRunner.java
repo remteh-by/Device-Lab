@@ -46,7 +46,7 @@ public final class QualityRunner extends Instrumentation {
    click("Поддержать разработку ↗");check(contains("Выберите способ поддержки")||contains("Choose a support method"),"Provider chooser opened");click(current.getString(android.R.string.cancel));
    File directory=new File(getTargetContext().getApplicationInfo().dataDir,"shared_prefs");check(directory.setWritable(false,false),"Prepare isolated write failure");
    try{click("Новая проверка");click("Сохранить и начать");Field f=current.getClass().getDeclaredField("session");f.setAccessible(true);check(f.get(current).equals(id),"Failed storage does not clear current session");}finally{check(directory.setWritable(true,true),"Restore test directory permissions");}
-   screenshot("phonecheck-0.2.1.png");com.remteh.qa.SupportQuality.verify(this,current);result.putString("support_methods","6");
+   screenshot("phonecheck-0.2.2.png");com.remteh.qa.SupportQuality.verify(this,current);result.putString("support_methods","1");
   }
   runOnMainSync(()->current.finish());waitForIdleSync();result.putString("passed","true");result.putInt("checks",checks);result.putString("scope","SDK Android 15, synthetic data; no hardware metrology or payment");finish(Activity.RESULT_OK,result);
  }catch(Throwable error){try{screenshot("failure.png");}catch(Exception ignored){}result.putString("passed","false");result.putString("failure",error.toString());finish(Activity.RESULT_CANCELED,result);}}
