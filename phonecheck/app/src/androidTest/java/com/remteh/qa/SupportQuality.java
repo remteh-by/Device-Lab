@@ -5,7 +5,7 @@ public final class SupportQuality {
  public static void verify(Instrumentation test,Activity host)throws Exception{
   if(!Build.MODEL.toLowerCase(Locale.ROOT).contains("sdk"))throw new AssertionError("SDK emulator only");
   byte[] bytes;try(InputStream in=host.getAssets().open("remteh-support.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);bytes=out.toByteArray();}
-  JSONObject data=new JSONObject(new String(bytes,java.nio.charset.StandardCharsets.UTF_8));JSONArray methods=data.getJSONArray("methods");if(methods.length()!=6)throw new AssertionError("Expected six destinations");
+  JSONObject data=new JSONObject(new String(bytes,java.nio.charset.StandardCharsets.UTF_8));JSONArray methods=data.getJSONArray("methods");if(methods.length()!=1)throw new AssertionError("Expected only the configured Ko-fi destination");
   JSONObject texts=data.getJSONObject("texts");String language=host.getResources().getConfiguration().locale.getLanguage();JSONObject copy=texts.optJSONObject(language);if(copy==null)copy=texts.getJSONObject("en");
   final List<String> opened=new ArrayList<>();Instrumentation.ActivityMonitor monitor=new Instrumentation.ActivityMonitor(){@Override public Instrumentation.ActivityResult onStartActivity(Intent intent){if(Intent.ACTION_VIEW.equals(intent.getAction())){opened.add(intent.getDataString());return new Instrumentation.ActivityResult(Activity.RESULT_OK,null);}return null;}};test.addMonitor(monitor);
   try{
@@ -15,7 +15,7 @@ public final class SupportQuality {
     click(test,method.getString("title"),true);String url=method.getString("url");if(!contains(test,url))throw new AssertionError("Destination missing: "+method.getString("id"));
     click(test,copy.getString("support_copy_link"),false);final String[] copied={null};test.runOnMainSync(()->{android.content.ClipboardManager cm=(android.content.ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE);if(cm!=null&&cm.hasPrimaryClip())copied[0]=cm.getPrimaryClip().getItemAt(0).coerceToText(host).toString();});if(!url.equals(copied[0]))throw new AssertionError("Copied destination mismatch");
     click(test,copy.getString("support_open_provider"),false);if(opened.size()!=i+1||!url.equals(opened.get(i)))throw new AssertionError("Browser destination mismatch");
-    if(method.getString("id").equals("donatepay")){Bitmap bmp=test.getUiAutomation().takeScreenshot();File dir=host.getExternalFilesDir("qa");if(!dir.exists())dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,"support-method.png"))){bmp.compress(Bitmap.CompressFormat.PNG,100,out);}bmp.recycle();}
+    if(method.getString("id").equals("kofi")){Bitmap bmp=test.getUiAutomation().takeScreenshot();File dir=host.getExternalFilesDir("qa");if(!dir.exists())dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,"support-method.png"))){bmp.compress(Bitmap.CompressFormat.PNG,100,out);}bmp.recycle();}
     click(test,copy.getString("support_choose"),false);
    }
    if(contains(test,"Patreon"))throw new AssertionError("Removed provider shown");

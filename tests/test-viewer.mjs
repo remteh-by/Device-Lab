@@ -14,10 +14,10 @@ try{
  const supportRegistry=JSON.parse(fs.readFileSync(root+'/support/registry.json','utf8'));
  for(const width of [390,1920,2560,3840]){
   await supportPage.setViewportSize({width,height:1000});await supportPage.goto(base+'assets/support/index.html');
-  assert.equal(await supportPage.locator('[data-method]').count(),6);assert.equal(await supportPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  assert.equal(await supportPage.locator('[data-method]').count(),1);assert.equal(await supportPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   for(const method of supportRegistry.methods){const card=supportPage.locator('[data-method='+method.id+']');assert.equal(await card.locator('a').getAttribute('href'),method.url);await card.locator('summary').click();await card.locator('img').evaluate(img=>img.decode());}
  }
- await supportContext.close();results.push({supportMethods:6,noJavascript:true,wideSupport:true});
+ await supportContext.close();results.push({supportMethods:1,noJavascript:true,wideSupport:true});
 
  for(const kind of ['mouse','controller','phone-intake']){
   const report=JSON.parse(fs.readFileSync(root+'/examples/'+kind+'.json','utf8'));report.comment='<img src=x onerror="window.injected=true">';await upload(page,'before',report);await page.locator('#left').getByText(report.comment,{exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.injected),undefined);assert(await page.locator('#left table tr').count()>0);

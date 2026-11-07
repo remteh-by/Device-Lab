@@ -10,56 +10,6 @@
       "enabled": true,
       "cadence": "both",
       "status": "configured"
-    },
-    {
-      "id": "afdian",
-      "title": "Afdian · 爱发电",
-      "url": "https://afdian.com/a/deckivo",
-      "network": "",
-      "qr": true,
-      "enabled": true,
-      "cadence": "monthly",
-      "status": "review"
-    },
-    {
-      "id": "boosty",
-      "title": "Boosty",
-      "url": "https://boosty.to/remteh",
-      "network": "",
-      "qr": true,
-      "enabled": true,
-      "cadence": "profile",
-      "status": "preparing"
-    },
-    {
-      "id": "donationalerts",
-      "title": "DonationAlerts",
-      "url": "https://www.donationalerts.com/r/deckivo",
-      "network": "",
-      "qr": true,
-      "enabled": true,
-      "cadence": "once",
-      "status": "unverified"
-    },
-    {
-      "id": "donatepay",
-      "title": "DonatePay",
-      "url": "https://donatepay.ru/don/1541009",
-      "network": "",
-      "qr": true,
-      "enabled": true,
-      "cadence": "once",
-      "status": "unverified"
-    },
-    {
-      "id": "okx_pay",
-      "title": "OKX Pay",
-      "url": "https://okx.com/ul/VQfh84m",
-      "network": "",
-      "qr": true,
-      "enabled": true,
-      "cadence": "app",
-      "status": "unverified"
     }
   ],
   "texts": {
@@ -560,5 +510,5 @@
       "support_provider_note": "Pembayaran diproses oleh layanan yang dipilih. Periksa status dan opsi pembayaran sebelum melanjutkan."
     }
   },
-  "source_sha256": "81543c3b08b32473da76adb3b442cf6c118bbf251ad1679ae9b66a3f5964e39a"
+  "source_sha256": "ffe0233932b069685bc77e376453d58a32db9bc0d940b48a95b1ab18657c5443"
 }
