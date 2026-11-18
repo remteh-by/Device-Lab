@@ -28,5 +28,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: chmod +x phonecheck/gradlew
-      - run: ./gradlew :app:assembleDebug :app:lintDebug
+      - run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
         working-directory: phonecheck
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phonecheck-debug-validation
+          path: phonecheck/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
