@@ -1,6 +1,6 @@
-# RemTeh PhoneCheck 0.2.2 preview
+# RemTeh PhoneCheck 0.2.3 preview
 
-Android 8+; проверено в отдельном Android 15 SDK-эмуляторе. [APK и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.3).
+Android 8+; проверено в отдельном Android 15 SDK-эмуляторе. [APK и SHA-256](https://github.com/remteh-by/Device-Lab/releases/tag/v0.2.4).
 
 Цветовые поля, мультитач, короткий сигнал через текущий аудиовыход, временная запись микрофона на 5 секунд и прослушивание, Vibrator API, доступные SensorManager-датчики, системная камера с миниатюрой, BatteryManager. Результат отмечает мастер: наблюдалось в тесте / есть замечание / не измерено / недоступно. Отказ в разрешении и отсутствие событий не отмечаются как успешный тест.
 
