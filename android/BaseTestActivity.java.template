@@ -233,7 +233,10 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
         stickLeft.setDeadZone(deadZone);
         stickRight.setDeadZone(deadZone);
 
-        btnResetCalib.setOnClickListener(v -> { saveLastReport(); clearLiveInput(); resetCalibration(); });
+        btnResetCalib.setOnClickListener(v -> {
+            if (!preserveSessionBeforeReset()) return;
+            clearLiveInput(); resetCalibration();
+        });
     }
 
     protected void resetCalibration() {
@@ -329,7 +332,7 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
     private boolean acceptDevice(InputDevice device) {
         if (device == null || !isGamepad(device)) return false;
         if (connectedDevice == null) onGamepadConnected(device);
-        return connectedDevice.getId() == device.getId();
+        return connectedDevice != null && connectedDevice.getId() == device.getId();
     }
 
     private int supportedAxis(InputDevice device, int preferred, int fallback) {
@@ -528,7 +531,7 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
 
     protected void onGamepadConnected(InputDevice device) {
         if (connectedDevice == null || connectedDevice.getId() != device.getId()) {
-            saveLastReport();
+            if (!preserveSessionBeforeReset()) return;
             stopVibration();
             clearLiveInput();
             resetCalibration();
@@ -823,6 +826,10 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
                 .setNeutralButton("Связать до / после", (dialog, which) -> { previousSession = importedId; message("Сессии связаны в текущем отчёте."); }).show();
     }
 
+    private boolean preserveSessionBeforeReset() {
+        return (measurements.frames() == 0 && totalPresses == 0) || saveLastReport();
+    }
+
     private boolean saveLastReport() {
         if (measurements.frames() == 0 && totalPresses == 0) return false;
         try {
@@ -831,7 +838,10 @@ public abstract class BaseTestActivity extends AppCompatActivity implements Inpu
             for (int i = 0; i < existing.length() && history.length() < 20; i++)
                 if (!sessionId.equals(existing.getJSONObject(i).optString("session_id")))
                     history.put(existing.getJSONObject(i));
-            getPreferences(MODE_PRIVATE).edit().putString("history", history.toString()).apply();
+            // A session may be cleared immediately after this call. Wait for a
+            // durable write and preserve the current measurements on failure.
+            if (!getPreferences(MODE_PRIVATE).edit().putString("history", history.toString()).commit())
+                throw new java.io.IOException("History write failed");
             return true;
         } catch (Exception error) { message("Историю не удалось сохранить. Экспортируйте отчёт в файл."); return false; }
     }
